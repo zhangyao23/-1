@@ -1,0 +1,16 @@
+# AI异常检测系统依赖库
+joblib
+numpy
+pandas
+scikit-learn
+# tensorflow
+torch
+psutil==5.9.5
+netifaces==0.11.0
+requests==2.31.0
+pyyaml==6.0.1
+matplotlib==3.7.2
+seaborn==0.12.2
+cryptography==41.0.3
+paramiko==3.2.0
+tensorflow==2.19.0 

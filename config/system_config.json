@@ -1,0 +1,85 @@
+{
+  "system": {
+    "name": "AI网络异常检测系统",
+    "version": "1.0.0",
+    "description": "基于AI的网络连接异常检测和诊断系统"
+  },
+  "data_collection": {
+    "interfaces": ["wlan0", "eth0"],
+    "collection_interval": 5,
+    "metrics": [
+      "signal_strength",
+      "packet_loss_rate", 
+      "data_rate",
+      "retry_count",
+      "latency",
+      "throughput",
+      "connection_count",
+      "beacon_interval",
+      "memory_usage",
+      "cpu_usage",
+      "dns_response_time",
+      "gateway_ping_time",
+      "packet_error_rate",
+      "authentication_attempts",
+      "bandwidth_utilization",
+      "interference_level"
+    ],
+    "timeout": 10
+  },
+  "buffer_manager": {
+    "buffer_size": 1000,
+    "data_retention_minutes": 30,
+    "save_threshold": 0.8,
+    "compression_enabled": true
+  },
+  "ai_models": {
+    "autoencoder": {
+      "model_path": "models/autoencoder_model",
+      "input_features": 28,
+      "encoding_dim": 10,
+      "threshold": 0.02,
+      "batch_size": 32,
+      "epochs": 100
+    },
+    "classifier": {
+      "model_path": "models/error_classifier.pkl",
+      "classes": [
+        "normal",
+        "anomaly_cluster_1",
+        "anomaly_cluster_2",
+        "anomaly_cluster_3",
+        "anomaly_cluster_4",
+        "anomaly_cluster_5",
+        "anomaly_cluster_6",
+        "anomaly_cluster_7"
+      ],
+      "confidence_threshold": 0.7,
+      "n_estimators": 100,
+      "max_depth": 10,
+      "min_samples_split": 5
+    }
+  },
+  "anomaly_detection": {
+    "detection_window": 10,
+    "severity_levels": {
+      "low": 0.3,
+      "medium": 0.6,
+      "high": 0.9
+    },
+    "auto_save_enabled": true,
+    "notification_enabled": true
+  },
+  "logging": {
+    "level": "INFO",
+    "file_path": "logs/anomaly_detector.log",
+    "max_file_size": "10MB",
+    "backup_count": 5,
+    "console_output": true
+  },
+  "storage": {
+    "anomaly_data_path": "data/anomalies/",
+    "model_backup_path": "data/models/",
+    "log_archive_path": "data/logs/"
+  }
+} 
