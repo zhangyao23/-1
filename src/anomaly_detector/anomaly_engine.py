@@ -65,12 +65,13 @@ class AnomalyDetectionEngine:
     def detect_anomaly_from_vector(self, feature_vector: np.ndarray, feature_names: List[str]) -> (bool, Dict):
         """
         [模拟器专用] 直接从特征向量进行异常检测。
-        如果注入了真实的自编码器和分类器模型，则使用它们；
-        否则，回退到简化的模拟判断逻辑。
+        实现两层判断架构：
+        1. 第一层：自编码器判断是否为异常（normal vs abnormal）
+        2. 第二层：如果是异常，分类器判断具体异常类型
         """
         # --- 优先使用真实模型逻辑 ---
         if self.autoencoder and hasattr(self.autoencoder, 'predict'):
-            self.logger.info("检测到真实模型，正在使用自编码器进行预测...")
+            self.logger.info("使用自编码器进行第一层判断（normal vs abnormal）...")
             
             # 确保输入是2D的
             if feature_vector.ndim == 1:
@@ -78,9 +79,10 @@ class AnomalyDetectionEngine:
             else:
                 feature_vector_2d = feature_vector
                 
+            # 第一层：自编码器判断是否异常
             autoencoder_result = self.autoencoder.predict(feature_vector_2d)
-            is_anomaly = autoencoder_result.get('is_anomaly', False) # 直接获取布尔值
-            details = autoencoder_result
+            is_anomaly = autoencoder_result.get('is_anomaly', False)
+            details = autoencoder_result.copy()
             
             # 安全地提取重构误差，无论其返回的是单个浮点数还是数组
             recon_error_val = details.get('reconstruction_error', 0.0)
@@ -90,11 +92,31 @@ class AnomalyDetectionEngine:
                 details['reconstruction_error'] = float(recon_error_val)
 
             details['is_anomaly'] = bool(is_anomaly)
-
+            
+            # 第二层：只有当自编码器判断为异常时，才使用分类器判断具体类型
             if is_anomaly and self.error_classifier and hasattr(self.error_classifier, 'classify_error'):
-                self.logger.info("自编码器发现异常，正在使用错误分类器进行分类...")
+                self.logger.info("自编码器判断为异常，使用分类器进行第二层判断（异常类型分类）...")
                 classification_result = self.error_classifier.classify_error(feature_vector_2d)
+                
+                # 过滤掉"normal"类别的预测（因为第一层已经判断不是正常）
+                predicted_class = classification_result.get('predicted_class', 'unknown')
+                if predicted_class == 'normal':
+                    # 如果分类器预测为normal但自编码器判断为异常，选择置信度第二高的类别
+                    class_probs = classification_result.get('class_probabilities', {})
+                    if class_probs:
+                        # 排除normal类别，选择置信度最高的异常类别
+                        anomaly_probs = {k: v for k, v in class_probs.items() if k != 'normal'}
+                        if anomaly_probs:
+                            predicted_class = max(anomaly_probs, key=anomaly_probs.get)
+                            classification_result['predicted_class'] = predicted_class
+                            classification_result['confidence'] = anomaly_probs[predicted_class]
+                            self.logger.info(f"分类器预测为normal但自编码器判断为异常，选择次优类别: {predicted_class}")
+                
                 details.update(classification_result)
+            elif is_anomaly:
+                # 如果没有分类器，给出默认的异常类型
+                details['predicted_class'] = 'unknown_anomaly'
+                details['confidence'] = 0.5
             
             return is_anomaly, details
 

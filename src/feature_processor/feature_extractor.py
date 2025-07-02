@@ -21,6 +21,9 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.impute import SimpleImputer
+import json
+import joblib
+import os
 
 
 class FeatureExtractor:
@@ -31,20 +34,21 @@ class FeatureExtractor:
     为后续的异常检测模型提供高质量的输入数据。
     """
     
-    def __init__(self, metrics_config: List[str], logger):
+    def __init__(self, metrics_config: List[str], logger, scaler_path: Optional[str] = None):
         """
         初始化特征提取器
         
         Args:
             metrics_config (List[str]): 需要处理的指标列表
             logger: 系统日志记录器
+            scaler_path: 预训练scaler的路径，如果为None则创建新的scaler
         """
         self.metrics_config = metrics_config
         self.logger = logger
+        self.scaler_path = scaler_path or "models/autoencoder_model/autoencoder_scaler.pkl"
         
         # 初始化数据预处理器
-        self.scaler = StandardScaler()
-        self.imputer = SimpleImputer(strategy='median')
+        self._initialize_scaler()
         
         # 特征名称映射
         self.feature_names = []
@@ -57,6 +61,24 @@ class FeatureExtractor:
         self.feature_stats = {}
         
         self.logger.info("特征提取器初始化完成")
+    
+    def _initialize_scaler(self):
+        """初始化或加载标准化器"""
+        try:
+            if os.path.exists(self.scaler_path):
+                # 加载预训练的scaler
+                self.scaler = joblib.load(self.scaler_path)
+                self.logger.info(f"已加载预训练的标准化器: {self.scaler_path}")
+                self._use_pretrained_scaler = True
+            else:
+                # 创建新的scaler（用于训练模式）
+                self.scaler = StandardScaler()
+                self.logger.info("创建新的标准化器")
+                self._use_pretrained_scaler = False
+        except Exception as e:
+            self.logger.warning(f"加载预训练scaler失败: {e}, 创建新的scaler")
+            self.scaler = StandardScaler()
+            self._use_pretrained_scaler = False
     
     def extract_features(self, raw_data: Dict[str, Any]) -> np.ndarray:
         """
@@ -347,44 +369,60 @@ class FeatureExtractor:
     
     def _convert_to_vector(self, features: Dict[str, float]) -> np.ndarray:
         """
-        将特征字典转换为向量
+        将特征字典转换为6维向量（降维处理）
         
         Args:
             features (Dict[str, float]): 特征字典
             
         Returns:
-            np.ndarray: 特征向量
+            np.ndarray: 6维特征向量
         """
-        # 确保特征顺序一致
+        # 定义固定的6个最重要特征名称，确保维度一致性
         if not self.feature_names:
-            self.feature_names = sorted(features.keys())
+            self.feature_names = [
+                'avg_signal_strength',  # 信号强度
+                'avg_data_rate',        # 数据传输速率
+                'avg_latency',          # 网络延迟
+                'total_packet_loss',    # 丢包率
+                'cpu_usage',            # CPU使用率
+                'memory_usage'          # 内存使用率
+            ]
         
-        # 按固定顺序提取特征值
+        # 按固定顺序提取特征值，始终保持6维
         feature_vector = []
         for name in self.feature_names:
             value = features.get(name, 0.0)
             feature_vector.append(value)
+        
+        # 确保正好是6维
+        while len(feature_vector) < 6:
+            feature_vector.append(0.0)
+        feature_vector = feature_vector[:6]
         
         return np.array(feature_vector, dtype=float)
     
     def _normalize_features(self, feature_vector: np.ndarray) -> np.ndarray:
         """
         对特征向量进行归一化。
-        在模拟环境中，我们用第一个数据点作为"基准"来拟合缩放器，
-        并用它来转换后续所有数据点，以正确计算偏差。
+        如果有预训练的scaler，使用它进行转换；否则进行拟合。
         """
         try:
             if feature_vector.ndim == 1:
                 feature_vector = feature_vector.reshape(1, -1)
             
-            # 检查缩放器是否已经用基准数据拟合过
-            if hasattr(self.scaler, 'mean_'):
-                # 如果已拟合，只进行转换
+            if self._use_pretrained_scaler:
+                # 使用预训练的scaler直接转换
                 normalized_vector = self.scaler.transform(feature_vector)
+                self.logger.debug("使用预训练scaler进行特征归一化")
             else:
-                # 如果未拟合（第一次调用），则进行拟合并转换
-                self.logger.info("首次运行，正在使用当前数据作为基准拟合标准化缩放器...")
-                normalized_vector = self.scaler.fit_transform(feature_vector)
+                # 训练模式：检查缩放器是否已经拟合过
+                if hasattr(self.scaler, 'mean_'):
+                    # 如果已拟合，只进行转换
+                    normalized_vector = self.scaler.transform(feature_vector)
+                else:
+                    # 如果未拟合（第一次调用），则进行拟合并转换
+                    self.logger.info("首次运行，正在使用当前数据作为基准拟合标准化缩放器...")
+                    normalized_vector = self.scaler.fit_transform(feature_vector)
             
             return normalized_vector.flatten()
             
@@ -460,8 +498,6 @@ class FeatureExtractor:
             filepath (str): 配置文件路径
         """
         try:
-            import json
-            
             config = {
                 'feature_names': self.feature_names,
                 'metrics_config': self.metrics_config,
@@ -484,8 +520,6 @@ class FeatureExtractor:
             filepath (str): 配置文件路径
         """
         try:
-            import json
-            
             with open(filepath, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
@@ -498,16 +532,17 @@ class FeatureExtractor:
             self.logger.warning(f"特征配置加载失败: {e}")
 
 
-def create_feature_extractor(config: Dict, logger) -> FeatureExtractor:
+def create_feature_extractor(config: Dict, logger, scaler_path: Optional[str] = None) -> FeatureExtractor:
     """
     创建特征提取器实例
     
     Args:
         config (Dict): 配置参数
         logger: 日志记录器
+        scaler_path: 预训练scaler的路径
         
     Returns:
         FeatureExtractor: 特征提取器实例
     """
     metrics = config.get('metrics', [])
-    return FeatureExtractor(metrics, logger) 
+    return FeatureExtractor(metrics, logger, scaler_path) 

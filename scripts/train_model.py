@@ -70,14 +70,15 @@ def train_autoencoder(config: dict, logger: SystemLogger, data_path: str):
         logger.error(f"自编码器训练过程中发生错误: {e}")
 
 def train_classifier(config: dict, logger: SystemLogger, data_path: str):
-    """训练错误分类器模型"""
+    """训练错误分类器模型（仅用于异常类型分类，不包含正常数据）"""
     logger.info("开始训练错误分类器模型...")
+    logger.info("注意：此分类器仅用于异常类型分类，正常/异常判断由自编码器负责")
     
     try:
-        # 加载数据
+        # 加载异常数据
         logger.info(f"从 '{data_path}' 加载带标签的异常数据...")
         labeled_data = pd.read_csv(data_path)
-        logger.info(f"成功加载 {len(labeled_data)} 条数据。")
+        logger.info(f"成功加载 {len(labeled_data)} 条异常数据。")
         
         if 'label' not in labeled_data.columns:
             logger.error(f"数据文件 '{data_path}' 中缺少 'label' 列。")
@@ -90,6 +91,12 @@ def train_classifier(config: dict, logger: SystemLogger, data_path: str):
         # 清洗标签数据，去除首尾空格
         cleaned_labels = labels.str.strip()
 
+        # 显示类别分布
+        label_counts = cleaned_labels.value_counts()
+        logger.info("异常类别分布：")
+        for label, count in label_counts.items():
+            logger.info(f"  {label}: {count} 条")
+
         # 将数据划分为训练集和测试集 (80/20)
         # 使用 stratify 确保在切分后，训练集和测试集中的类别分布与原始数据集一致
         X_train, X_test, y_train, y_test = train_test_split(
@@ -97,8 +104,14 @@ def train_classifier(config: dict, logger: SystemLogger, data_path: str):
         )
         logger.info(f"数据集划分完成。训练集: {len(X_train)} 条, 测试集: {len(y_test)} 条。")
         
+        # 更新配置中的类别列表
+        classifier_config = config['ai_models']['classifier'].copy()
+        unique_labels = sorted(cleaned_labels.unique().tolist())
+        classifier_config['classes'] = unique_labels
+        logger.info(f"分类器支持的异常类别: {unique_labels}")
+        
         # 初始化模型
-        classifier = ErrorClassifier(config['ai_models']['classifier'], logger)
+        classifier = ErrorClassifier(classifier_config, logger)
         
         # 训练模型 (仅使用训练集)
         logger.info("开始使用训练集训练模型...")

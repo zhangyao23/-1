@@ -36,23 +36,21 @@
   "ai_models": {
     "autoencoder": {
       "model_path": "models/autoencoder_model",
-      "input_features": 28,
-      "encoding_dim": 10,
-      "threshold": 0.02,
+      "input_features": 6,
+      "encoding_dim": 3,
+      "threshold": 3.0,
       "batch_size": 32,
       "epochs": 100
     },
     "classifier": {
       "model_path": "models/error_classifier.pkl",
       "classes": [
-        "normal",
-        "anomaly_cluster_1",
-        "anomaly_cluster_2",
-        "anomaly_cluster_3",
-        "anomaly_cluster_4",
-        "anomaly_cluster_5",
-        "anomaly_cluster_6",
-        "anomaly_cluster_7"
+        "signal_degradation",
+        "network_congestion",
+        "connection_timeout",
+        "packet_corruption",
+        "resource_overload",
+        "mixed_anomaly"
       ],
       "confidence_threshold": 0.7,
       "n_estimators": 100,

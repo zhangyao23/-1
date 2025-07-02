@@ -60,6 +60,10 @@ class AutoencoderModel:
         self.decoder = None
         self.scaler = StandardScaler()
         
+        # SavedModel 相关属性
+        self.saved_model = None
+        self.model_inference = None
+        
         # 训练历史
         self.training_history = {}
         self.threshold_history = []
@@ -70,6 +74,9 @@ class AutoencoderModel:
         
         # 加载预训练模型（如果存在）
         self._load_model()
+        
+        # 检查是否有优化后的阈值
+        self._load_optimized_threshold()
         
         self.logger.info("自编码器模型初始化完成")
     
@@ -157,10 +164,19 @@ class AutoencoderModel:
         try:
             self.logger.info(f"开始训练自编码器，数据形状: {training_data.shape}")
             
+            # 动态设置输入特征数量
+            actual_features = training_data.shape[1]
+            if actual_features != self.input_features:
+                self.logger.info(f"数据特征数量({actual_features})与配置不符({self.input_features})，自动调整配置")
+                self.input_features = actual_features
+                # 相应调整编码维度
+                self.encoding_dim = max(min(self.input_features // 2, self.encoding_dim), 5)
+                self.logger.info(f"调整后的编码维度: {self.encoding_dim}")
+            
             # 数据预处理
             training_data = self._preprocess_data(training_data)
             
-            # 构建模型（如果尚未构建）
+            # 构建模型（如果尚未构建或特征数量发生变化）
             if self.model is None:
                 self.build_model(training_data.shape[1])
             
@@ -208,6 +224,8 @@ class AutoencoderModel:
                 'final_val_loss': history.history['val_loss'][-1],
                 'epochs_trained': len(history.history['loss']),
                 'threshold': self.threshold,
+                'input_features': self.input_features,
+                'encoding_dim': self.encoding_dim,
                 'model_saved': True
             }
             
@@ -229,7 +247,7 @@ class AutoencoderModel:
             Dict[str, Any]: 预测结果
         """
         try:
-            if self.model is None:
+            if self.model is None or self.model_inference is None:
                 raise ValueError("模型尚未加载或训练")
             
             self.inference_count += 1
@@ -240,8 +258,10 @@ class AutoencoderModel:
             if processed_data.ndim == 1:
                 processed_data = processed_data.reshape(1, -1)
             
-            # 模型推理
-            reconstructed = self.model.predict(processed_data, verbose=0)
+            # 模型推理 - 使用SavedModel的推理函数
+            input_tensor = tf.constant(processed_data, dtype=tf.float32)
+            outputs = self.model_inference(inputs=input_tensor)
+            reconstructed = outputs[list(outputs.keys())[0]].numpy()
             
             # 计算重构误差
             reconstruction_error = np.mean(np.square(processed_data - reconstructed), axis=1)
@@ -318,7 +338,14 @@ class AutoencoderModel:
         """
         try:
             # 使用训练数据计算重构误差分布
-            reconstructed = self.model.predict(training_data, verbose=0)
+            if hasattr(self, 'model_inference') and self.model_inference is not None:
+                # 使用SavedModel推理函数
+                input_tensor = tf.constant(training_data, dtype=tf.float32)
+                outputs = self.model_inference(inputs=input_tensor)
+                reconstructed = outputs[list(outputs.keys())[0]].numpy()
+            else:
+                # 使用Keras模型
+                reconstructed = self.model.predict(training_data, verbose=0)
             reconstruction_errors = np.mean(np.square(training_data - reconstructed), axis=1)
             
             # 使用95%分位数作为阈值
@@ -432,33 +459,90 @@ class AutoencoderModel:
         try:
             model_dir = self.model_path
             scaler_file = os.path.join(self.model_path, 'autoencoder_scaler.pkl')
+            config_file = os.path.join(self.model_path, 'autoencoder_config.json')
             
             if os.path.exists(model_dir):
                 # 使用 TensorFlow SavedModel 格式加载
-                self.model = tf.saved_model.load(model_dir)
+                self.saved_model = tf.saved_model.load(model_dir)
+                
+                # 获取推理函数
+                self.model_inference = self.saved_model.signatures['serving_default']
                 self.logger.info(f"成功从 {model_dir} 加载预训练模型")
                 
+                # 加载保存的配置和阈值
+                if os.path.exists(config_file):
+                    import json
+                    with open(config_file, 'r', encoding='utf-8') as f:
+                        saved_config = json.load(f)
+                    
+                    # 使用保存的阈值
+                    saved_threshold = saved_config.get('threshold', self.threshold)
+                    if saved_threshold != self.threshold:
+                        self.logger.info(f"使用保存的阈值: {saved_threshold:.6f} (配置文件阈值: {self.threshold:.6f})")
+                        self.threshold = saved_threshold
+                    
+                    # 恢复其他保存的信息
+                    self.threshold_history = saved_config.get('threshold_history', [])
+                    self.training_history = saved_config.get('training_history', {})
+                    self.inference_count = saved_config.get('inference_count', 0)
+                    self.anomaly_count = saved_config.get('anomaly_count', 0)
+                    
+                    # 更新模型参数
+                    self.input_features = saved_config.get('input_features', self.input_features)
+                    self.encoding_dim = saved_config.get('encoding_dim', self.encoding_dim)
+                    
+                    self.logger.info(f"成功加载模型配置，阈值: {self.threshold:.6f}")
+                else:
+                    self.logger.warning(f"未找到配置文件 {config_file}，使用默认阈值")
+                
                 if os.path.exists(scaler_file):
-                    # 使用 'rb' (二进制读取) 模式加载 joblib 文件
-                    with open(scaler_file, 'rb') as f:
-                        self.scaler = joblib.load(f)
-                    self.logger.info(f"成功从 {scaler_file} 加载预训练的scaler")
+                    # 检查scaler的特征数量是否与当前数据匹配
+                    try:
+                        with open(scaler_file, 'rb') as f:
+                            temp_scaler = joblib.load(f)
+                        
+                        # 检查scaler的特征数量
+                        if hasattr(temp_scaler, 'n_features_in_'):
+                            saved_features = temp_scaler.n_features_in_
+                            if saved_features != self.input_features:
+                                self.logger.warning(f"保存的scaler特征数量({saved_features})与当前配置({self.input_features})不匹配，将重新初始化scaler")
+                                # 重新初始化scaler
+                                self.scaler = StandardScaler()
+                            else:
+                                self.scaler = temp_scaler
+                                self.logger.info(f"成功从 {scaler_file} 加载预训练的scaler")
+                        else:
+                            self.scaler = temp_scaler
+                            self.logger.info(f"成功从 {scaler_file} 加载预训练的scaler")
+                    except Exception as scaler_error:
+                        self.logger.warning(f"加载scaler失败: {scaler_error}，将使用新的scaler")
+                        self.scaler = StandardScaler()
                 else:
                     self.logger.warning(f"未找到对应的scaler文件 {scaler_file}，将使用新的scaler")
-                    
-                # 重新获取编码器
-                encoder_layer = self.model.get_layer(name='encoder_layer2')
-                if encoder_layer:
-                    input_layer = self.model.input
-                    self.encoder = keras.Model(inputs=input_layer, outputs=encoder_layer.output, name='encoder')
+                
+                # 标记模型已加载
+                self.model = self.saved_model
                 
             else:
                 self.logger.warning(f"模型文件 {model_dir} 不存在，需要先训练模型")
                 self.model = None
+                self.model_inference = None
 
         except Exception as e:
-            self.logger.error(f"加载模型文件 {self.model_path} 失败，请检查文件是否损坏或与当前环境不兼容: {e}")
+            self.logger.error(f"加载模型失败: {e}")
+            self.logger.info("将清理旧模型文件并重新开始训练")
+            # 清理可能损坏的模型文件
+            if os.path.exists(self.model_path):
+                import shutil
+                try:
+                    shutil.rmtree(self.model_path)
+                    self.logger.info(f"已清理损坏的模型文件: {self.model_path}")
+                except Exception as cleanup_error:
+                    self.logger.warning(f"清理模型文件失败: {cleanup_error}")
+            
             self.model = None
+            self.model_inference = None
+            self.scaler = StandardScaler()
     
     def get_model_summary(self) -> Dict[str, Any]:
         """获取模型摘要信息"""
@@ -524,6 +608,30 @@ class AutoencoderModel:
         except Exception as e:
             self.logger.error(f"性能评估失败: {e}")
             return {}
+    
+    def _load_optimized_threshold(self):
+        """加载优化后的阈值（如果存在）"""
+        try:
+            threshold_file = os.path.join(self.model_path, 'optimized_threshold.txt')
+            if os.path.exists(threshold_file):
+                with open(threshold_file, 'r') as f:
+                    optimized_threshold = float(f.read().strip())
+                old_threshold = self.threshold
+                self.threshold = optimized_threshold
+                self.logger.info(f"使用优化后的阈值: {optimized_threshold:.6f} (原阈值: {old_threshold:.6f})")
+        except Exception as e:
+            self.logger.warning(f"加载优化阈值失败: {e}")
+    
+    def save_optimized_threshold(self, threshold: float):
+        """保存优化后的阈值"""
+        try:
+            os.makedirs(self.model_path, exist_ok=True)
+            threshold_file = os.path.join(self.model_path, 'optimized_threshold.txt')
+            with open(threshold_file, 'w') as f:
+                f.write(str(threshold))
+            self.logger.info(f"优化阈值已保存: {threshold:.6f}")
+        except Exception as e:
+            self.logger.error(f"保存优化阈值失败: {e}")
 
 
 def create_autoencoder_model(config: Dict, logger) -> AutoencoderModel:

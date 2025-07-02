@@ -159,7 +159,7 @@ class ErrorClassifier:
                 'is_confident': confidence >= self.confidence_threshold,
                 'class_probabilities': {
                     class_name: float(prob) 
-                    for class_name, prob in zip(self.classes, class_probabilities)
+                    for class_name, prob in zip(self.label_encoder.classes_, class_probabilities)
                 },
                 'timestamp': datetime.now().isoformat()
             }
