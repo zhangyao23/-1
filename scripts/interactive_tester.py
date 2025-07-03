@@ -3,6 +3,7 @@ import sys
 import json
 import argparse
 import numpy as np
+import joblib
 
 # 将src目录添加到Python路径中
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -18,48 +19,55 @@ def load_config():
     with open(config_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-def convert_raw_to_6d_features(raw_data):
+def convert_raw_to_6d_features(raw_data, config):
     """
-    直接将11维原始数据转换为6维特征
-    映射逻辑基于训练数据的格式
+    将11维原始数据转换为6维标准化特征
+    使用训练时的scaler进行正确的标准化
     """
     # 6个核心特征名称（与训练数据一致）
     features = np.zeros(6)
     
     # 1. avg_signal_strength: 基于wireless_quality
-    # 训练数据范围：70-90（正常），15-45（异常）
     features[0] = raw_data.get('wlan0_wireless_quality', 70.0)
     
-    # 2. avg_data_rate: 基于传输速率，归一化到0-1
-    # 训练数据范围：0.45-0.75（正常），0.1-0.5（异常）
+    # 2. avg_data_rate: 基于传输速率，转换为Mbps
     send_rate = raw_data.get('wlan0_send_rate_bps', 500000.0)
     recv_rate = raw_data.get('wlan0_recv_rate_bps', 1500000.0)
     avg_rate = (send_rate + recv_rate) / 2
-    # 将速率归一化到0-1范围（假设最大速率为2000000 bps）
-    features[1] = min(avg_rate / 2000000.0, 1.0)
+    features[1] = avg_rate / 1000000.0  # 转换为Mbps
     
     # 3. avg_latency: 基于网络延迟
-    # 训练数据范围：10-30ms（正常），50-350ms（异常）
     ping_time = raw_data.get('gateway_ping_time', 12.5)
     dns_time = raw_data.get('dns_response_time', 25.0)
     features[2] = (ping_time + dns_time) / 2
     
     # 4. total_packet_loss: 基于丢包率和重传
-    # 训练数据范围：0.001-0.05（正常），0.05-0.8（异常）
     packet_loss = raw_data.get('wlan0_packet_loss_rate', 0.01)
     retrans = raw_data.get('tcp_retrans_segments', 5)
-    # 优化重传次数转换逻辑：5次重传不应等于5%丢包
-    # 正常情况下5次重传约等于0.5%额外丢包
-    retrans_loss = min(retrans / 1000.0, 0.05)  # 最多贡献5%丢包率
+    retrans_loss = min(retrans / 1000.0, 0.05)
     features[3] = packet_loss + retrans_loss
     
     # 5. cpu_usage: CPU使用率
-    # 训练数据范围：5-30%（正常），60-95%（异常）
     features[4] = raw_data.get('cpu_percent', 15.0)
     
     # 6. memory_usage: 内存使用率
-    # 训练数据范围：30-70%（正常），65-95%（异常）
     features[5] = raw_data.get('memory_percent', 45.0)
+    
+    # 关键修复：使用训练时的scaler进行标准化
+    try:
+        model_path = config['ai_models']['autoencoder']['model_path']
+        scaler_path = os.path.join(model_path, 'autoencoder_scaler.pkl')
+        
+        if os.path.exists(scaler_path):
+            scaler = joblib.load(scaler_path)
+            features = features.reshape(1, -1)  # 转换为2D数组
+            features = scaler.transform(features)  # 标准化
+            features = features.flatten()  # 转换回1D数组
+            print(f"✅ 使用scaler标准化: {scaler_path}")
+        else:
+            print(f"⚠️ 未找到scaler文件: {scaler_path}，使用原始特征值")
+    except Exception as e:
+        print(f"❌ 标准化失败: {e}，使用原始特征值")
     
     return features
 
@@ -125,7 +133,8 @@ def run_interactive_session(engine):
     print("--------------------------")
 
     print("\n正在处理数据并进行AI检测...")
-    feature_vector = convert_raw_to_6d_features(raw_input_data)
+    config = load_config()
+    feature_vector = convert_raw_to_6d_features(raw_input_data, config)
     feature_names = get_feature_names()
     
     if feature_vector.size == 0:
@@ -166,7 +175,8 @@ def run_auto_session(engine):
     print("--------------------------")
 
     print("\n正在处理数据并进行AI检测...")
-    feature_vector = convert_raw_to_6d_features(default_inputs)
+    config = load_config()
+    feature_vector = convert_raw_to_6d_features(default_inputs, config)
     feature_names = get_feature_names()
     
     if feature_vector.size == 0:

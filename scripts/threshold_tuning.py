@@ -89,84 +89,54 @@ class ThresholdTuner:
             print(f"❌ 加载测试场景失败: {e}")
             return []
     
-    def _map_to_training_features(self, input_data: Dict) -> np.ndarray:
-        """将实际数据映射到训练特征格式"""
-        # 从实际的11个网络指标映射到28个训练特征
-        feature_mapping = {
-            # 基础网络指标
-            'wlan0_wireless_quality': 0,
-            'wlan0_signal_level': 1,
-            'wlan0_noise_level': 2,
-            'wlan0_rx_packets': 3,
-            'wlan0_tx_packets': 4,
-            'wlan0_rx_bytes': 5,
-            'wlan0_tx_bytes': 6,
-            'gateway_ping_time': 7,
-            'dns_resolution_time': 8,
-            'memory_usage_percent': 9,
-            'cpu_usage_percent': 10
-        }
-        
-        # 初始化28个特征的数组
-        features = np.zeros(28)
-        
-        # 映射已知的特征
-        for key, value in input_data.items():
-            if key in feature_mapping:
-                features[feature_mapping[key]] = value
-        
-        # 生成派生特征
-        if 'wlan0_wireless_quality' in input_data and 'wlan0_signal_level' in input_data:
-            features[11] = input_data['wlan0_wireless_quality'] / abs(input_data['wlan0_signal_level']) if input_data['wlan0_signal_level'] != 0 else 0
-        
-        if 'wlan0_rx_packets' in input_data and 'wlan0_tx_packets' in input_data:
-            features[12] = (input_data['wlan0_rx_packets'] + input_data['wlan0_tx_packets']) / 2
-        
-        if 'gateway_ping_time' in input_data and 'dns_resolution_time' in input_data:
-            features[13] = (input_data['gateway_ping_time'] + input_data['dns_resolution_time']) / 2
-        
-        if 'memory_usage_percent' in input_data and 'cpu_usage_percent' in input_data:
-            features[14] = (input_data['memory_usage_percent'] + input_data['cpu_usage_percent']) / 2
-        
-        # 网络性能组合特征
-        if 'wlan0_rx_bytes' in input_data and 'wlan0_tx_bytes' in input_data:
-            features[15] = input_data['wlan0_rx_bytes'] / (input_data['wlan0_tx_bytes'] + 1)
-            features[16] = (input_data['wlan0_rx_bytes'] + input_data['wlan0_tx_bytes']) / 1024
-        
-        # 延迟相关特征
-        if 'gateway_ping_time' in input_data:
-            features[17] = np.log1p(input_data['gateway_ping_time'])
-            features[18] = input_data['gateway_ping_time'] ** 2
-        
-        if 'dns_resolution_time' in input_data:
-            features[19] = np.log1p(input_data['dns_resolution_time'])
-            features[20] = input_data['dns_resolution_time'] ** 2
-        
-        # 资源利用率特征
-        if 'memory_usage_percent' in input_data:
-            features[21] = np.log1p(input_data['memory_usage_percent'])
-            features[22] = input_data['memory_usage_percent'] ** 2
-        
-        if 'cpu_usage_percent' in input_data:
-            features[23] = np.log1p(input_data['cpu_usage_percent'])
-            features[24] = input_data['cpu_usage_percent'] ** 2
-        
-        # 交互特征
-        if 'wlan0_wireless_quality' in input_data and 'gateway_ping_time' in input_data:
-            features[25] = input_data['wlan0_wireless_quality'] * input_data['gateway_ping_time']
-        
-        if 'memory_usage_percent' in input_data and 'cpu_usage_percent' in input_data:
-            features[26] = input_data['memory_usage_percent'] * input_data['cpu_usage_percent']
-        
-        # 综合指标
-        signal_quality = input_data.get('wlan0_wireless_quality', 0)
-        ping_time = input_data.get('gateway_ping_time', 0)
-        cpu_usage = input_data.get('cpu_usage_percent', 0)
-        memory_usage = input_data.get('memory_usage_percent', 0)
-        
-        features[27] = (signal_quality * 0.3 - ping_time * 0.3 - cpu_usage * 0.2 - memory_usage * 0.2)
-        
-        return features
+    def map_real_data_to_training_features(self, input_data):
+        """
+        将真实的11个网络指标映射到6个训练特征
+        Args:
+            input_data: 包含11个原始网络指标的字典
+        Returns:
+            6维特征数组，对应训练时使用的特征
+        """
+        try:
+            # 初始化6个特征的数组
+            features = np.zeros(6)
+            
+            # 特征0: avg_signal_strength (平均信号强度)
+            signal_quality = input_data.get('wlan0_wireless_quality', 70)
+            signal_level = input_data.get('wlan0_signal_level', -50)
+            features[0] = (signal_quality + abs(signal_level)) / 20.0  # 标准化
+            
+            # 特征1: avg_data_rate (平均数据速率)  
+            rx_rate = input_data.get('wlan0_rx_packets', 100)
+            tx_rate = input_data.get('wlan0_tx_packets', 100)
+            features[1] = (rx_rate + tx_rate) / 10000.0  # 标准化
+            
+            # 特征2: avg_latency (平均延迟)
+            gateway_ping = input_data.get('gateway_ping_time', 10)
+            dns_time = input_data.get('dns_resolution_time', 20)
+            features[2] = (gateway_ping + dns_time) / 2.0
+            
+            # 特征3: packet_loss_rate (丢包率)
+            noise_level = input_data.get('wlan0_noise_level', -80)
+            features[3] = max(0, (abs(noise_level) - 70) / 10.0)  # 基于噪声计算丢包率
+            
+            # 特征4: system_load (系统负载)
+            cpu_usage = input_data.get('cpu_usage_percent', 20)
+            memory_usage = input_data.get('memory_usage_percent', 50)
+            features[4] = (cpu_usage + memory_usage) / 100.0 - 0.5  # 中心化
+            
+            # 特征5: network_stability (网络稳定性)
+            rx_bytes = input_data.get('wlan0_rx_bytes', 1000)
+            tx_bytes = input_data.get('wlan0_tx_bytes', 1000)
+            stability = min(1.0, (rx_bytes + tx_bytes) / 50000.0)
+            features[5] = stability
+            
+            return features
+            
+        except Exception as e:
+            print(f"特征映射错误: {e}")
+            # 返回默认的6维特征向量
+            return np.array([0.5, 0.0, 15.0, 0.1, 0.2, 0.8])
     
     def evaluate_threshold(self, threshold: float, scenarios: List[Dict]) -> Dict[str, Any]:
         """评估特定阈值下的检测性能"""
@@ -191,7 +161,7 @@ class ThresholdTuner:
             expected_anomaly = scenario.get('expected_anomaly', None)
             
             # 提取特征并检测
-            features = self._map_to_training_features(scenario['data'])
+            features = self.map_real_data_to_training_features(scenario['data'])
             
             # 使用AutoencoderModel的predict方法
             prediction = self.autoencoder.predict(features)
@@ -246,7 +216,7 @@ class ThresholdTuner:
             # 基于重构误差范围自动确定阈值范围
             errors = []
             for scenario in scenarios:
-                features = self._map_to_training_features(scenario['data'])
+                features = self.map_real_data_to_training_features(scenario['data'])
                 prediction = self.autoencoder.predict(features)
                 error = prediction.get('reconstruction_error', 0.0)
                 errors.append(error)

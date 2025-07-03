@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 单向量异常检测测试脚本
-生成随机28维向量并使用训练好的模型进行异常检测
+生成随机6维向量并使用训练好的模型进行异常检测
 """
 
 import sys
@@ -26,17 +26,44 @@ def load_config():
 
 def generate_random_vector():
     """
-    生成一个随机的28维向量进行测试
+    生成一个随机的6维向量进行测试
     """
     # 生成接近正常数据分布的向量（大概率是正常的）
-    normal_like_vector = np.random.normal(loc=0, scale=0.7, size=28)
+    # 基于6维特征: avg_signal_strength, avg_data_rate, avg_latency, packet_loss_rate, system_load, network_stability
+    normal_like_vector = np.array([
+        np.random.normal(6.25, 2.4),     # avg_signal_strength (0-10范围)
+        np.random.normal(-0.04, 0.01),  # avg_data_rate (固定值附近小变化)
+        np.random.normal(8.86, 5.0),    # avg_latency (0-50范围)
+        np.random.normal(1.41, 0.1),    # packet_loss_rate (1-2范围)
+        np.random.normal(-0.32, 0.1),   # system_load (-1到1范围)
+        np.random.normal(0.93, 0.05)    # network_stability (0-1范围)
+    ])
     
     # 生成明显异常的向量（某些维度有极值）
-    anomaly_like_vector = np.random.normal(loc=0, scale=0.7, size=28)
+    anomaly_like_vector = np.array([
+        np.random.normal(6.25, 2.4),     # avg_signal_strength
+        np.random.normal(-0.04, 0.01),  # avg_data_rate
+        np.random.normal(8.86, 5.0),    # avg_latency
+        np.random.normal(1.41, 0.1),    # packet_loss_rate
+        np.random.normal(-0.32, 0.1),   # system_load
+        np.random.normal(0.93, 0.05)    # network_stability
+    ])
+    
     # 在几个随机维度上添加明显的异常值
-    anomaly_dims = np.random.choice(28, size=np.random.randint(2, 5), replace=False)
+    anomaly_dims = np.random.choice(6, size=np.random.randint(1, 3), replace=False)
     for dim in anomaly_dims:
-        anomaly_like_vector[dim] += np.random.uniform(4, 6) * np.random.choice([-1, 1])
+        if dim == 0:  # avg_signal_strength
+            anomaly_like_vector[dim] += np.random.uniform(-5, 5)
+        elif dim == 1:  # avg_data_rate
+            anomaly_like_vector[dim] += np.random.uniform(-0.1, 0.1)
+        elif dim == 2:  # avg_latency
+            anomaly_like_vector[dim] += np.random.uniform(20, 100)
+        elif dim == 3:  # packet_loss_rate
+            anomaly_like_vector[dim] += np.random.uniform(0.5, 2.0)
+        elif dim == 4:  # system_load
+            anomaly_like_vector[dim] += np.random.uniform(-0.5, 1.0)
+        elif dim == 5:  # network_stability
+            anomaly_like_vector[dim] += np.random.uniform(-0.3, 0.3)
     
     # 随机选择一种类型
     if np.random.random() < 0.3:  # 30%概率生成异常向量
@@ -62,8 +89,10 @@ def test_vector_detection(vector, engine, extractor):
     print("🔍 开始异常检测测试")
     print("=" * 60)
     
-    print(f"📊 测试向量（28维）:")
-    print(f"   {vector}")
+    print(f"📊 测试向量（6维）:")
+    print(f"   特征值: {vector}")
+    print(f"   [信号强度: {vector[0]:.3f}, 数据速率: {vector[1]:.3f}, 延迟: {vector[2]:.3f}")
+    print(f"    丢包率: {vector[3]:.3f}, 系统负载: {vector[4]:.3f}, 网络稳定性: {vector[5]:.3f}]")
     print(f"   向量统计: 均值={vector.mean():.3f}, 标准差={vector.std():.3f}")
     print(f"   最大值={vector.max():.3f}, 最小值={vector.min():.3f}")
     print()

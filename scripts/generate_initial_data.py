@@ -14,7 +14,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 # 定义要生成的数据量 - 更符合现实的分布
 NUM_NORMAL_SAMPLES = 18000  # 正常数据占90%
-NUM_FEATURES = 28
+NUM_FEATURES = 6
 NUM_ANOMALY_CLUSTERS = 7
 SAMPLES_PER_CLUSTER = 200   # 每个异常类别200个样本
 NUM_BOUNDARY_SAMPLES = 150  # 边界模糊的难分类点

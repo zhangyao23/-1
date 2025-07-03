@@ -87,7 +87,7 @@ graph TD
 
 ### 2.5 数据处理文件
 - **`src/feature_processor/feature_extractor.py`**
-  - 功能：将原始系统指标转换为28维特征向量
+  - 功能：将原始系统指标转换为6维特征向量
   - 处理：统计计算、数据聚合、标准化
 
 - **`src/anomaly_detector/anomaly_engine.py`**
@@ -155,7 +155,7 @@ anomaly_engine = AnomalyDetectionEngine(
 ```python
 # feature_extractor.py 中的处理
 feature_vector = extractor.extract_features(raw_input)
-# 输出：28维浮点数数组，如：[-0.7071, 1.2247, 0.0000, ...]
+# 输出：6维浮点数数组，如：[0.7071, 1.2247, 0.0000, ...]
 ```
 
 **步骤3：数据标准化**
@@ -187,7 +187,7 @@ if is_anomaly:
 
 ### 3.3 关键数据结构
 
-**特征向量（28维）**
+**特征向量（6维）**
 ```
 [avg_data_rate, max_data_rate, avg_latency, max_latency, 
  avg_signal_strength, cpu_usage, memory_usage, 

@@ -148,7 +148,7 @@ def analyze_feature_distributions():
                 'expected': scenario['expected']
             }
             
-            # 添加特征值（假设24维特征）
+            # 添加特征值（假设6维特征）
             for i, feature_value in enumerate(features):
                 feature_data_row[f'feature_{i:02d}'] = feature_value
             

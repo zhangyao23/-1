@@ -176,18 +176,22 @@ class FeatureExtractor:
         """
         basic_features = {}
         
-        # 信号强度相关特征
-        signal_keys = [k for k in data.keys() if 'signal' in k.lower() or 'wireless' in k.lower()]
+        # 信号强度相关特征 (只使用quality，不包含level)
+        quality_keys = [k for k in data.keys() if 'quality' in k.lower()]
+        if quality_keys:
+            quality_values = [data[k] for k in quality_keys]
+            basic_features['avg_signal_strength'] = np.mean(quality_values)
+        else:
+            # 如果没有质量指标，使用所有信号相关指标（向后兼容）
+            signal_keys = [k for k in data.keys() if 'signal' in k.lower()]
         if signal_keys:
             signal_values = [data[k] for k in signal_keys]
             basic_features['avg_signal_strength'] = np.mean(signal_values)
-            basic_features['min_signal_strength'] = np.min(signal_values)
-            basic_features['signal_variance'] = np.var(signal_values)
         
-        # 数据传输速率特征
+        # 数据传输速率特征 (转换为Mbps)
         rate_keys = [k for k in data.keys() if 'rate' in k.lower() and 'bps' in k.lower()]
         if rate_keys:
-            rate_values = [data[k] for k in rate_keys]
+            rate_values = [data[k] / 1000000.0 for k in rate_keys]  # 转换为Mbps
             basic_features['total_data_rate'] = np.sum(rate_values)
             basic_features['avg_data_rate'] = np.mean(rate_values)
             basic_features['max_data_rate'] = np.max(rate_values)
@@ -199,8 +203,8 @@ class FeatureExtractor:
             basic_features['total_packet_loss'] = np.sum(loss_values)
             basic_features['max_packet_loss'] = np.max(loss_values)
         
-        # 延迟特征
-        latency_keys = [k for k in data.keys() if 'latency' in k.lower() or 'ping' in k.lower()]
+        # 延迟特征 (包含所有延迟相关指标)
+        latency_keys = [k for k in data.keys() if 'latency' in k.lower() or 'ping' in k.lower() or 'response_time' in k.lower()]
         if latency_keys:
             latency_values = [data[k] for k in latency_keys]
             basic_features['avg_latency'] = np.mean(latency_values)

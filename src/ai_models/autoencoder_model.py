@@ -260,7 +260,12 @@ class AutoencoderModel:
             
             # 模型推理 - 使用SavedModel的推理函数
             input_tensor = tf.constant(processed_data, dtype=tf.float32)
-            outputs = self.model_inference(inputs=input_tensor)
+            
+            # 获取签名函数的输入参数名
+            input_key = list(self.model_inference.structured_input_signature[1].keys())[0]
+            
+            # 调用推理函数，使用正确的参数名
+            outputs = self.model_inference(**{input_key: input_tensor})
             reconstructed = outputs[list(outputs.keys())[0]].numpy()
             
             # 计算重构误差
@@ -315,12 +320,26 @@ class AutoencoderModel:
             if data.ndim == 1:
                 data = data.reshape(1, -1)
             
-            # 标准化处理
+            # 标准化处理 - 修复RobustScaler兼容性问题
+            # 检查scaler是否已经拟合（兼容StandardScaler和RobustScaler）
+            scaler_fitted = False
+            
+            # StandardScaler检查
             if hasattr(self.scaler, 'mean_') and self.scaler.mean_ is not None:
+                scaler_fitted = True
+            # RobustScaler检查
+            elif hasattr(self.scaler, 'center_') and self.scaler.center_ is not None:
+                scaler_fitted = True
+            # 通用检查
+            elif hasattr(self.scaler, 'n_features_in_') and self.scaler.n_features_in_ is not None:
+                scaler_fitted = True
+            
+            if scaler_fitted:
                 # 使用已拟合的scaler
                 data = self.scaler.transform(data)
             else:
-                # 首次使用，拟合并转换
+                # 警告：不应该在预测时拟合scaler
+                self.logger.warning("⚠️ Scaler未拟合，在预测时拟合可能导致不一致的结果！")
                 data = self.scaler.fit_transform(data)
             
             return data.astype(np.float32)

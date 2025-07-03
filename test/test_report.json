@@ -1,0 +1,31 @@
+{
+  "timestamp": "2025-07-02T16:08:49.096155",
+  "total_tests": 22,
+  "passed_tests": 16,
+  "failed_tests": 6,
+  "pass_rate": 72.72727272727273,
+  "detailed_results": {
+    "dir_src": true,
+    "dir_models": true,
+    "dir_data": true,
+    "dir_config": true,
+    "dir_scripts": true,
+    "dir_test": true,
+    "file_requirements.txt": true,
+    "file_README.md": true,
+    "file_config_system_config.json": true,
+    "file_models_error_classifier.pkl": true,
+    "system_config": false,
+    "data_6维正常数据": true,
+    "data_6维异常数据": true,
+    "classifier_model": false,
+    "autoencoder_model": true,
+    "module_特征处理器": true,
+    "module_异常检测器": false,
+    "module_AI模型": false,
+    "module_主程序": true,
+    "feature_extraction": false,
+    "anomaly_detection": false,
+    "data_generation": true
+  }
+}

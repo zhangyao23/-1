@@ -259,7 +259,7 @@ class RealDataTester:
                 'cpu_usage_percent': input_data.get('cpu_percent', 15.0)
             }
             
-            # 使用FeatureExtractor提取24维特征（与训练时完全一致）
+            # 使用FeatureExtractor提取6维特征（与训练时完全一致）
             feature_vector = self.feature_extractor.extract_features(metrics_data)
             
             if feature_vector.size == 0:
@@ -270,7 +270,7 @@ class RealDataTester:
                     'detection_time': time.time() - start_time
                 }
             
-            # 使用训练时的特征名称（24个特征）
+            # 使用训练时的特征名称（6个特征）
             feature_names = [f'feature_{i}' for i in range(len(feature_vector))]
             
             # 异常检测
@@ -301,7 +301,7 @@ class RealDataTester:
             }
     
     # 删除这个方法，不再需要手工映射特征
-    # 现在统一使用FeatureExtractor进行24维特征提取
+    # 现在统一使用FeatureExtractor进行6维特征提取
     
     def _display_single_result(self, result: Dict):
         """显示单个检测结果"""

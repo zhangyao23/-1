@@ -1,0 +1,9 @@
+{
+  "model_type": "improved_autoencoder",
+  "input_features": 6,
+  "encoding_dim": 4,
+  "threshold": 0.4893938785012688,
+  "architecture": "6->8->4->8->6",
+  "training_samples": "normal_data_only",
+  "scaler_type": "RobustScaler"
+}

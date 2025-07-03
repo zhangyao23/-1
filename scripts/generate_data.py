@@ -20,8 +20,8 @@ def generate_normal_traffic():
     with open(NORMAL_TRAFFIC_FILE, 'a', newline='') as f:
         writer = csv.writer(f)
         for _ in range(NUM_NORMAL_SAMPLES):
-            # 正常流量数据是28个在[-1, 1]范围内的浮点数
-            row = np.random.uniform(-1, 1, 28).tolist()
+            # 正常流量数据是6个在[-1, 1]范围内的浮点数
+            row = np.random.uniform(-1, 1, 6).tolist()
             writer.writerow(row)
     print(f"成功将 {NUM_NORMAL_SAMPLES} 条数据追加到 {NORMAL_TRAFFIC_FILE}")
 

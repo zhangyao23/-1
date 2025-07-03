@@ -229,12 +229,35 @@ class ErrorClassifier:
             
             model_data = joblib.load(self.model_path)
             
-            self.classifier = model_data.get('classifier')
-            self.label_encoder = model_data.get('label_encoder', LabelEncoder())
-            self.classes = model_data.get('classes', self.classes)
-            self.confidence_threshold = model_data.get('confidence_threshold', self.confidence_threshold)
-            self.class_predictions = model_data.get('class_predictions', {cls: 0 for cls in self.classes})
-            self.classification_count = model_data.get('classification_count', 0)
+            # 处理不同的模型文件格式
+            if isinstance(model_data, dict):
+                # 新格式：包含完整字典的模型文件
+                # 兼容不同的键名：'classifier'或'model'
+                self.classifier = model_data.get('classifier') or model_data.get('model')
+                self.label_encoder = model_data.get('label_encoder', LabelEncoder())
+                
+                # 处理classes字段，可能是list或numpy数组
+                loaded_classes = model_data.get('classes', self.classes)
+                if hasattr(loaded_classes, 'tolist'):
+                    self.classes = loaded_classes.tolist()
+                else:
+                    self.classes = loaded_classes
+                
+                self.confidence_threshold = model_data.get('confidence_threshold', self.confidence_threshold)
+                self.class_predictions = model_data.get('class_predictions', {cls: 0 for cls in self.classes})
+                self.classification_count = model_data.get('classification_count', 0)
+                
+                if self.classifier is not None:
+                    self.logger.info(f"加载完整分类器模型字典: {self.model_path}")
+                    self.logger.info(f"分类器类型: {type(self.classifier)}")
+                    self.logger.info(f"支持的类别: {self.classes}")
+                else:
+                    self.logger.error("模型文件中未找到分类器对象（键名'classifier'或'model'）")
+            else:
+                # 旧格式：直接保存的RandomForestClassifier对象
+                self.classifier = model_data
+                self.label_encoder.fit(self.classes)  # 重新构建label_encoder
+                self.logger.info(f"加载简化分类器模型: {self.model_path}，重新构建标签编码器")
             
             self.logger.info(f"分类器模型已从 {self.model_path} 加载")
             

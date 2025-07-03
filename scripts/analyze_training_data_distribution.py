@@ -36,9 +36,9 @@ def analyze_training_data():
                 print(f"📁 使用CSV训练数据: {csv_path}")
                 df = pd.read_csv(csv_path)
                 
-                # 假设前24列是特征，最后一列是标签
-                if len(df.columns) >= 25:
-                    X = df.iloc[:, :24].values
+                # 假设前6列是特征，最后一列是标签
+                if len(df.columns) >= 7:
+                    X = df.iloc[:, :6].values
                 else:
                     print(f"❌ CSV文件列数不足: {len(df.columns)}")
                     return None

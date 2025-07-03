@@ -18,17 +18,17 @@ def fix_broken_csv_file():
         found_broken_line = False
         
         for i, line in enumerate(lines):
-            # 默认每行应该有28个字段，逗号分隔就是27个
+            # 默认每行应该有6个字段，逗号分隔就是5个
             # 损坏的行会有更多字段
             if line.count(',') > 30: # 使用一个比27大的阈值来识别
                 print(f"发现损坏的行在行号 {i+1}。正在尝试修复...")
                 found_broken_line = True
                 
-                # 我们知道它是由两行各有28个字段的数据组成的
+                # 我们知道它是由两行各有6个字段的数据组成的
                 parts = line.strip().split(',')
-                if len(parts) > 28: # 确保有足够的部分可以拆分
-                    line1_parts = parts[:28]
-                    line2_parts = parts[28:]
+                if len(parts) > 6: # 确保有足够的部分可以拆分
+                    line1_parts = parts[:6]
+                    line2_parts = parts[6:]
                     
                     # 重新组合成两行
                     fixed_lines.append(','.join(line1_parts) + '\\n')

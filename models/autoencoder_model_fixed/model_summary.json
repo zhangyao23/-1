@@ -1,0 +1,17 @@
+{
+    "model_type": "autoencoder",
+    "input_dim": 6,
+    "encoding_dim": 3,
+    "feature_names": [
+        "avg_signal_strength",
+        "avg_data_rate",
+        "avg_latency",
+        "packet_loss_rate",
+        "system_load",
+        "network_stability"
+    ],
+    "training_samples": 15000,
+    "anomaly_threshold": 1.0833802620440616e-07,
+    "training_loss": 1.411276961960084e-08,
+    "validation_loss": 7.316707240079268e-08
+}
