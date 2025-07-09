@@ -1,0 +1,216 @@
+{
+  "scenarios": [
+    {
+      "name": "正常网络状态",
+      "description": "网络运行正常，所有指标在正常范围内",
+      "input_data": {
+        "wlan0_wireless_quality": 85.0,
+        "wlan0_signal_level": -45.0,
+        "wlan0_noise_level": -92.0,
+        "wlan0_rx_packets": 18500,
+        "wlan0_tx_packets": 15200,
+        "wlan0_rx_bytes": 3500000,
+        "wlan0_tx_bytes": 2800000,
+        "gateway_ping_time": 15.0,
+        "dns_resolution_time": 25.0,
+        "memory_usage_percent": 35.0,
+        "cpu_usage_percent": 20.0
+      },
+      "dlc_outputs": {
+        "stage1_detection": [[-2.1543, 3.8967]],
+        "stage2_classification": null,
+        "expected_result": {
+          "is_anomaly": false,
+          "confidence": 0.9933
+        }
+      }
+    },
+    {
+      "name": "WiFi信号衰减异常",
+      "description": "WiFi信号质量下降，信号强度弱，噪声较高",
+      "input_data": {
+        "wlan0_wireless_quality": 45.0,
+        "wlan0_signal_level": -70.0,
+        "wlan0_noise_level": -75.0,
+        "wlan0_rx_packets": 6000,
+        "wlan0_tx_packets": 4500,
+        "wlan0_rx_bytes": 1200000,
+        "wlan0_tx_bytes": 1000000,
+        "gateway_ping_time": 45.0,
+        "dns_resolution_time": 60.0,
+        "memory_usage_percent": 45.0,
+        "cpu_usage_percent": 30.0
+      },
+      "dlc_outputs": {
+        "stage1_detection": [[4.2156, -1.3547]],
+        "stage2_classification": [[3.2156, -1.1547, 0.8432, -0.5231, 1.2341, -2.1234]],
+        "expected_result": {
+          "is_anomaly": true,
+          "anomaly_type": "wifi_degradation",
+          "confidence_detection": 0.8765,
+          "confidence_classification": 0.7234
+        }
+      }
+    },
+    {
+      "name": "网络延迟异常",
+      "description": "网关ping时间和DNS解析时间过高",
+      "input_data": {
+        "wlan0_wireless_quality": 70.0,
+        "wlan0_signal_level": -55.0,
+        "wlan0_noise_level": -85.0,
+        "wlan0_rx_packets": 12000,
+        "wlan0_tx_packets": 9000,
+        "wlan0_rx_bytes": 2200000,
+        "wlan0_tx_bytes": 1800000,
+        "gateway_ping_time": 150.0,
+        "dns_resolution_time": 200.0,
+        "memory_usage_percent": 40.0,
+        "cpu_usage_percent": 25.0
+      },
+      "dlc_outputs": {
+        "stage1_detection": [[3.1234, -0.8765]],
+        "stage2_classification": [[-0.8432, 4.1234, -1.2341, 0.2156, -0.5431, 1.3456]],
+        "expected_result": {
+          "is_anomaly": true,
+          "anomaly_type": "network_latency",
+          "confidence_detection": 0.9234,
+          "confidence_classification": 0.8456
+        }
+      }
+    },
+    {
+      "name": "连接不稳定异常",
+      "description": "网络连接不稳定，包传输不规律",
+      "input_data": {
+        "wlan0_wireless_quality": 65.0,
+        "wlan0_signal_level": -60.0,
+        "wlan0_noise_level": -80.0,
+        "wlan0_rx_packets": 8000,
+        "wlan0_tx_packets": 12000,
+        "wlan0_rx_bytes": 1500000,
+        "wlan0_tx_bytes": 2800000,
+        "gateway_ping_time": 25.0,
+        "dns_resolution_time": 35.0,
+        "memory_usage_percent": 42.0,
+        "cpu_usage_percent": 28.0
+      },
+      "dlc_outputs": {
+        "stage1_detection": [[2.8456, -0.9123]],
+        "stage2_classification": [[-1.2341, 0.3456, 3.4567, -0.8765, 1.1234, -0.6789]],
+        "expected_result": {
+          "is_anomaly": true,
+          "anomaly_type": "connection_instability",
+          "confidence_detection": 0.8823,
+          "confidence_classification": 0.7645
+        }
+      }
+    },
+    {
+      "name": "带宽拥塞异常",
+      "description": "网络带宽拥塞，数据传输速率受限",
+      "input_data": {
+        "wlan0_wireless_quality": 75.0,
+        "wlan0_signal_level": -50.0,
+        "wlan0_noise_level": -88.0,
+        "wlan0_rx_packets": 25000,
+        "wlan0_tx_packets": 22000,
+        "wlan0_rx_bytes": 8000000,
+        "wlan0_tx_bytes": 7500000,
+        "gateway_ping_time": 35.0,
+        "dns_resolution_time": 45.0,
+        "memory_usage_percent": 55.0,
+        "cpu_usage_percent": 45.0
+      },
+      "dlc_outputs": {
+        "stage1_detection": [[2.1345, -1.2346]],
+        "stage2_classification": [[0.1234, -0.5678, -1.1234, 3.8765, 0.9876, -2.3456]],
+        "expected_result": {
+          "is_anomaly": true,
+          "anomaly_type": "bandwidth_congestion",
+          "confidence_detection": 0.8567,
+          "confidence_classification": 0.6923
+        }
+      }
+    },
+    {
+      "name": "系统压力异常",
+      "description": "CPU和内存使用率过高，系统资源紧张",
+      "input_data": {
+        "wlan0_wireless_quality": 75.0,
+        "wlan0_signal_level": -50.0,
+        "wlan0_noise_level": -90.0,
+        "wlan0_rx_packets": 14000,
+        "wlan0_tx_packets": 11000,
+        "wlan0_rx_bytes": 2800000,
+        "wlan0_tx_bytes": 2300000,
+        "gateway_ping_time": 30.0,
+        "dns_resolution_time": 40.0,
+        "memory_usage_percent": 95.0,
+        "cpu_usage_percent": 90.0
+      },
+      "dlc_outputs": {
+        "stage1_detection": [[2.8765, -1.2341]],
+        "stage2_classification": [[-1.2341, 0.3456, -0.8765, 1.1234, 4.4567, -0.6789]],
+        "expected_result": {
+          "is_anomaly": true,
+          "anomaly_type": "system_stress",
+          "confidence_detection": 0.8932,
+          "confidence_classification": 0.7892
+        }
+      }
+    },
+    {
+      "name": "DNS解析问题",
+      "description": "DNS解析时间异常长，可能是DNS服务器问题",
+      "input_data": {
+        "wlan0_wireless_quality": 78.0,
+        "wlan0_signal_level": -48.0,
+        "wlan0_noise_level": -87.0,
+        "wlan0_rx_packets": 16000,
+        "wlan0_tx_packets": 13500,
+        "wlan0_rx_bytes": 3200000,
+        "wlan0_tx_bytes": 2700000,
+        "gateway_ping_time": 18.0,
+        "dns_resolution_time": 180.0,
+        "memory_usage_percent": 38.0,
+        "cpu_usage_percent": 23.0
+      },
+      "dlc_outputs": {
+        "stage1_detection": [[1.9876, -1.5432]],
+        "stage2_classification": [[0.8765, -1.2341, 0.3456, -0.8765, 1.1234, 3.6789]],
+        "expected_result": {
+          "is_anomaly": true,
+          "anomaly_type": "dns_issues",
+          "confidence_detection": 0.8234,
+          "confidence_classification": 0.7123
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "version": "1.0",
+    "created": "2025-07-07",
+    "description": "DLC模型输出测试数据集",
+    "anomaly_classes": {
+      "0": "wifi_degradation",
+      "1": "network_latency",
+      "2": "connection_instability",
+      "3": "bandwidth_congestion",
+      "4": "system_stress",
+      "5": "dns_issues"
+    },
+    "output_formats": {
+      "stage1_detection": {
+        "shape": "[1, 2]",
+        "description": "异常检测输出：[异常logit, 正常logit]",
+        "data_type": "float32"
+      },
+      "stage2_classification": {
+        "shape": "[1, 6]",
+        "description": "异常分类输出：6个异常类型的logit值",
+        "data_type": "float32"
+      }
+    }
+  }
+} 
