@@ -1,9 +1,9 @@
 {
-  "timestamp": "1752029526",
-  "processing_time_ms": 9,
+  "timestamp": "1752030361",
+  "processing_time_ms": 8,
 {
   "detection_stage": {
-    "raw_logits": [-3015686.500000, 2455289.250000],
+    "raw_logits": [-5477018.500000, 4459345.000000],
     "probabilities": [0.000000, 1.000000],
     "predicted_class": 1,
     "is_anomaly": false,

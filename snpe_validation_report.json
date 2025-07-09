@@ -1,0 +1,131 @@
+{
+  "tests": [
+    {
+      "name": "目录检查: include/",
+      "status": "PASS",
+      "details": "存在 (237 文件)",
+      "time_ms": 0
+    },
+    {
+      "name": "目录检查: lib/",
+      "status": "PASS",
+      "details": "存在 (2655 文件)",
+      "time_ms": 0
+    },
+    {
+      "name": "目录检查: bin/",
+      "status": "PASS",
+      "details": "存在 (76678 文件)",
+      "time_ms": 0
+    },
+    {
+      "name": "头文件: SNPE.hpp",
+      "status": "PASS",
+      "details": "22.0KB",
+      "time_ms": 0
+    },
+    {
+      "name": "头文件: SNPEFactory.hpp",
+      "status": "PASS",
+      "details": "8.1KB",
+      "time_ms": 0
+    },
+    {
+      "name": "头文件: IDlContainer.hpp",
+      "status": "PASS",
+      "details": "6.2KB",
+      "time_ms": 0
+    },
+    {
+      "name": "头文件: TensorMap.hpp",
+      "status": "PASS",
+      "details": "3.7KB",
+      "time_ms": 0
+    },
+    {
+      "name": "核心库: libSNPE.so",
+      "status": "PASS",
+      "details": "13.8MB",
+      "time_ms": 0
+    },
+    {
+      "name": "异常检测模型",
+      "status": "WARN",
+      "details": "57.1KB, 验证异常: [Errno 13] Permission denied: '/home/yaoyao/实习随机森林",
+      "time_ms": 0
+    },
+    {
+      "name": "异常分类模型",
+      "status": "WARN",
+      "details": "190.2KB, 验证异常: [Errno 13] Permission denied: '/home/yaoyao/实习随机森林",
+      "time_ms": 0
+    },
+    {
+      "name": "数据标准化器",
+      "status": "PASS",
+      "details": "0.8KB",
+      "time_ms": 0
+    },
+    {
+      "name": "模型总大小",
+      "status": "PASS",
+      "details": "248.1KB",
+      "time_ms": 0
+    },
+    {
+      "name": "C++编译",
+      "status": "PASS",
+      "details": "成功, 84KB可执行文件",
+      "time_ms": 1393
+    },
+    {
+      "name": "推理测试: 正常数据",
+      "status": "WARN",
+      "details": "推理成功但结果解析失败",
+      "time_ms": 37
+    },
+    {
+      "name": "推理测试: WiFi异常",
+      "status": "WARN",
+      "details": "推理成功但结果解析失败",
+      "time_ms": 19
+    },
+    {
+      "name": "推理测试: 网络延迟",
+      "status": "WARN",
+      "details": "推理成功但结果解析失败",
+      "time_ms": 11
+    },
+    {
+      "name": "CPU运行时",
+      "status": "PASS",
+      "details": "x86_64-linux-clang库已安装",
+      "time_ms": 0
+    },
+    {
+      "name": "GPU运行时",
+      "status": "WARN",
+      "details": "GPU库文件不可用（正常情况）",
+      "time_ms": 0
+    },
+    {
+      "name": "DSP运行时",
+      "status": "WARN",
+      "details": "DSP库不可用（正常情况）",
+      "time_ms": 0
+    },
+    {
+      "name": "可用运行时",
+      "status": "PASS",
+      "details": "CPU",
+      "time_ms": 0
+    }
+  ],
+  "summary": {
+    "total_tests": 20,
+    "passed": 13,
+    "failed": 0,
+    "warnings": 7,
+    "success_rate": "65.0%"
+  }
+}
