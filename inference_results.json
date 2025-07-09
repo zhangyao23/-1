@@ -1,0 +1,16 @@
+{
+  "timestamp": "1752029526",
+  "processing_time_ms": 9,
+{
+  "detection_stage": {
+    "raw_logits": [-3015686.500000, 2455289.250000],
+    "probabilities": [0.000000, 1.000000],
+    "predicted_class": 1,
+    "is_anomaly": false,
+    "confidence": 1.000000,
+    "anomaly_probability": 0.000000,
+    "normal_probability": 1.000000
+  },
+  "classification_stage": null,
+  "status": "success"
+}

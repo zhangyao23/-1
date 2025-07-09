@@ -1,0 +1,40 @@
+{
+  "scenario_name": "system_stress",
+  "description": "CPU和内存使用率过高",
+  "original_data": {
+    "wlan0_wireless_quality": 75.0,
+    "wlan0_signal_level": -50.0,
+    "wlan0_noise_level": -90.0,
+    "wlan0_rx_packets": 14000.0,
+    "wlan0_tx_packets": 11000.0,
+    "wlan0_rx_bytes": 2800000.0,
+    "wlan0_tx_bytes": 2300000.0,
+    "gateway_ping_time": 30.0,
+    "dns_resolution_time": 40.0,
+    "memory_usage_percent": 95.0,
+    "cpu_usage_percent": 90.0
+  },
+  "float_array": [
+    75.0,
+    -50.0,
+    -90.0,
+    14000.0,
+    11000.0,
+    2800000.0,
+    2300000.0,
+    30.0,
+    40.0,
+    95.0,
+    90.0
+  ],
+  "expected_result": {
+    "is_anomaly": true,
+    "anomaly_type": "system_stress"
+  },
+  "binary_format": {
+    "data_type": "float32",
+    "byte_order": "little-endian",
+    "size_bytes": 44,
+    "element_count": 11
+  }
+}

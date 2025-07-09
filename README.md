@@ -273,6 +273,19 @@ python test_realistic_end_to_end_system.py
 
 ## 🚀 快速开始
 
+### 🎯 一键项目设置（推荐）
+
+```bash
+# 1. 运行项目设置脚本
+./setup_project.sh
+
+# 2. 运行快速测试
+./quick_test.sh
+
+# 3. 验证项目完整性
+python3 scripts/verify_project_paths.py
+```
+
 ### 环境要求
 
 ```bash
@@ -282,12 +295,45 @@ scikit-learn
 numpy
 pandas
 joblib
+G++ 编译器
+SNPE SDK 2.26.2.240911
 ```
 
-### 安装依赖
+### 📁 项目路径配置
+
+项目采用统一的路径管理，所有配置都在 `config/project_paths.conf` 中定义：
+
+```
+📦 项目根目录/
+├── 📁 2.26.2.240911/           # SNPE SDK (自动检测)
+├── 📁 config/                  # 配置文件目录
+│   └── project_paths.conf      # 路径配置文件
+├── 📁 scripts/                 # 脚本目录
+│   └── verify_project_paths.py # 路径验证脚本
+├── 📄 setup_project.sh         # 项目设置脚本
+├── 📄 quick_test.sh            # 快速测试脚本
+├── 📄 build_mobile_inference.sh # 编译脚本（自动路径检测）
+└── 📄 dlc_mobile_inference.cpp  # C++推理程序
+```
+
+### 🔧 路径配置特性
+
+1. **自动路径检测**: 编译脚本自动检测项目根目录和系统架构
+2. **SNPE SDK集成**: 基于项目内的 `2.26.2.240911/` 目录
+3. **跨平台支持**: 自动选择合适的库架构（x86_64, aarch64）
+4. **完整性验证**: 提供详细的文件和依赖检查
+
+### 手动安装依赖
 
 ```bash
+# Python依赖
 pip install tensorflow scikit-learn numpy pandas joblib
+
+# Ubuntu/Debian编译环境
+sudo apt-get install build-essential
+
+# CentOS/RHEL编译环境  
+sudo yum install gcc-c++
 ```
 
 ### 快速验证系统 (推荐)
@@ -310,24 +356,31 @@ python3 test/quick_autoencoder_test.py
 ### 📱 移动设备部署方案
 
 ```bash
-# 1. 验证C++代码功能（推荐）
+# 方案1：使用一键设置（推荐）
+./setup_project.sh                 # 项目设置和验证
+./quick_test.sh                    # 完整测试流程
+
+# 方案2：手动逐步执行
+# 1. 验证项目完整性
+python3 scripts/verify_project_paths.py
+
+# 2. 验证C++代码功能（推荐）
 python3 test/quick_cpp_test.py      # 快速验证
 python3 test/verify_cpp_functionality.py  # 完整验证
 
-# 2. 生成测试数据
+# 3. 生成测试数据
 python3 generate_test_input.py
 
-# 3. 编译C++推理程序
-chmod +x build_mobile_inference.sh
+# 4. 编译C++推理程序（自动检测路径）
 ./build_mobile_inference.sh
 
-# 4. 运行移动设备推理
+# 5. 运行移动设备推理
 ./dlc_mobile_inference \
     realistic_end_to_end_anomaly_detector.dlc \
     realistic_end_to_end_anomaly_classifier.dlc \
     normal_input.bin
 
-# 5. 查看推理结果
+# 6. 查看推理结果
 cat inference_results.json
 ```
 
@@ -469,6 +522,13 @@ features_6d = convert_raw_to_6d_features(raw_data, config)
 │   ├── 📄 guide/cpp_verification_guide.md  # C++验证指南
 │   ├── 📄 guide/quick_cpp_verification.md  # 快速验证指南
 │   └── 📄 guide/cpp_files_functionality.md # C++文件功能说明
+│
+├── 📁 项目路径配置和管理/
+│   ├── 📄 config/project_paths.conf        # 统一路径配置文件
+│   ├── 📄 scripts/verify_project_paths.py  # 项目完整性验证脚本
+│   ├── 📄 setup_project.sh                # 一键项目设置脚本
+│   ├── 📄 quick_test.sh                   # 快速测试脚本
+│   └── 📄 build_mobile_inference.sh       # 智能编译脚本（自动路径检测）
 │
 ├── 📁 版本文档/
 │   ├── 📄 VERSION_v2.0_FINAL.md            # v2.0版本说明

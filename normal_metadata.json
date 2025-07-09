@@ -1,0 +1,40 @@
+{
+  "scenario_name": "normal",
+  "description": "所有网络指标都在正常范围内",
+  "original_data": {
+    "wlan0_wireless_quality": 85.0,
+    "wlan0_signal_level": -45.0,
+    "wlan0_noise_level": -92.0,
+    "wlan0_rx_packets": 18500.0,
+    "wlan0_tx_packets": 15200.0,
+    "wlan0_rx_bytes": 3500000.0,
+    "wlan0_tx_bytes": 2800000.0,
+    "gateway_ping_time": 15.0,
+    "dns_resolution_time": 25.0,
+    "memory_usage_percent": 35.0,
+    "cpu_usage_percent": 20.0
+  },
+  "float_array": [
+    85.0,
+    -45.0,
+    -92.0,
+    18500.0,
+    15200.0,
+    3500000.0,
+    2800000.0,
+    15.0,
+    25.0,
+    35.0,
+    20.0
+  ],
+  "expected_result": {
+    "is_anomaly": false,
+    "anomaly_type": null
+  },
+  "binary_format": {
+    "data_type": "float32",
+    "byte_order": "little-endian",
+    "size_bytes": 44,
+    "element_count": 11
+  }
+}

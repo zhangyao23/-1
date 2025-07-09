@@ -1,0 +1,40 @@
+{
+  "scenario_name": "network_latency",
+  "description": "网关ping和DNS解析时间过高",
+  "original_data": {
+    "wlan0_wireless_quality": 70.0,
+    "wlan0_signal_level": -55.0,
+    "wlan0_noise_level": -85.0,
+    "wlan0_rx_packets": 12000.0,
+    "wlan0_tx_packets": 9000.0,
+    "wlan0_rx_bytes": 2200000.0,
+    "wlan0_tx_bytes": 1800000.0,
+    "gateway_ping_time": 150.0,
+    "dns_resolution_time": 200.0,
+    "memory_usage_percent": 40.0,
+    "cpu_usage_percent": 25.0
+  },
+  "float_array": [
+    70.0,
+    -55.0,
+    -85.0,
+    12000.0,
+    9000.0,
+    2200000.0,
+    1800000.0,
+    150.0,
+    200.0,
+    40.0,
+    25.0
+  ],
+  "expected_result": {
+    "is_anomaly": true,
+    "anomaly_type": "network_latency"
+  },
+  "binary_format": {
+    "data_type": "float32",
+    "byte_order": "little-endian",
+    "size_bytes": 44,
+    "element_count": 11
+  }
+}
