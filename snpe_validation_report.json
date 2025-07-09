@@ -51,13 +51,13 @@
     {
       "name": "异常检测模型",
       "status": "WARN",
-      "details": "57.1KB, 验证异常: [Errno 13] Permission denied: '/home/yaoyao/实习随机森林",
+      "details": "57.1KB, DLC验证失败",
       "time_ms": 0
     },
     {
       "name": "异常分类模型",
       "status": "WARN",
-      "details": "190.2KB, 验证异常: [Errno 13] Permission denied: '/home/yaoyao/实习随机森林",
+      "details": "190.2KB, DLC验证失败",
       "time_ms": 0
     },
     {
@@ -76,25 +76,25 @@
       "name": "C++编译",
       "status": "PASS",
       "details": "成功, 84KB可执行文件",
-      "time_ms": 1393
+      "time_ms": 1322
     },
     {
       "name": "推理测试: 正常数据",
       "status": "WARN",
       "details": "推理成功但结果解析失败",
-      "time_ms": 37
+      "time_ms": 30
     },
     {
       "name": "推理测试: WiFi异常",
       "status": "WARN",
       "details": "推理成功但结果解析失败",
-      "time_ms": 19
+      "time_ms": 28
     },
     {
       "name": "推理测试: 网络延迟",
       "status": "WARN",
       "details": "推理成功但结果解析失败",
-      "time_ms": 11
+      "time_ms": 29
     },
     {
       "name": "CPU运行时",

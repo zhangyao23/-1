@@ -19,6 +19,9 @@
 #include <chrono>
 #include <cmath>
 #include <algorithm>
+#include <iomanip>
+
+#include "src/include/json.hpp"
 
 // SNPE Headers
 #include "SNPE/SNPE.hpp"
@@ -136,6 +139,45 @@ bool saveResultsToFile(const std::string& filename, const std::string& results) 
     file << results;
     file.close();
     return true;
+}
+
+/**
+ * @brief 从JSON文件加载输入数据
+ * 
+ * @param filename JSON文件路径
+ * @param input_vector 输出的11维向量
+ * @return nlohmann::json 解析后的JSON对象
+ */
+nlohmann::json loadInputFromJson(const std::string& filename, std::vector<float>& input_vector) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open input JSON file: " + filename);
+    }
+    
+    nlohmann::json data = nlohmann::json::parse(file);
+    
+    // 验证network_data是否存在
+    if (!data.contains("network_data")) {
+        throw std::runtime_error("JSON is missing 'network_data' field.");
+    }
+    auto network_data = data["network_data"];
+    
+    // 按照固定顺序提取
+    const std::vector<std::string> required_fields = {
+        "wlan0_wireless_quality", "wlan0_signal_level", "wlan0_noise_level",
+        "wlan0_rx_packets", "wlan0_tx_packets", "wlan0_rx_bytes", "wlan0_tx_bytes",
+        "gateway_ping_time", "dns_resolution_time", "memory_usage_percent", "cpu_usage_percent"
+    };
+    
+    input_vector.clear();
+    for (const auto& field : required_fields) {
+        if (!network_data.contains(field)) {
+            throw std::runtime_error("JSON is missing field: " + field);
+        }
+        input_vector.push_back(network_data[field].get<float>());
+    }
+    
+    return data;
 }
 
 // ================================================================================================
@@ -330,271 +372,270 @@ public:
  * @param probabilities 输出概率
  */
 void applySoftmax(const float* logits, size_t size, float* probabilities) {
+    if (!logits || !probabilities) return;
+    
+    std::vector<float> exp_values(size);
+    float sum_of_exp = 0.0f;
+    
     // 找到最大值以提高数值稳定性
-    float maxLogit = *std::max_element(logits, logits + size);
+    float max_logit = *std::max_element(logits, logits + size);
     
-    // 计算exp值的和
-    float sum = 0.0f;
     for (size_t i = 0; i < size; ++i) {
-        probabilities[i] = std::exp(logits[i] - maxLogit);
-        sum += probabilities[i];
+        exp_values[i] = std::exp(logits[i] - max_logit);
+        sum_of_exp += exp_values[i];
     }
     
-    // 归一化
     for (size_t i = 0; i < size; ++i) {
-        probabilities[i] /= sum;
+        probabilities[i] = exp_values[i] / sum_of_exp;
     }
 }
 
+// 异常类型映射
+const std::vector<std::string> ANOMALY_CLASSES = {
+    "wifi_degradation",
+    "network_latency",
+    "connection_instability",
+    "bandwidth_congestion",
+    "system_stress",
+    "dns_issues"
+};
+
 /**
- * @brief 处理异常检测输出
- * @param logits 异常检测logits [2]
- * @return JSON格式结果字符串
+ * @brief 处理阶段1（异常检测）的输出
  */
-std::string processDetectionOutput(const float* logits) {
-    float probabilities[2];
-    applySoftmax(logits, 2, probabilities);
-    
-    int predictedClass = (probabilities[0] > probabilities[1]) ? 0 : 1;
-    bool isAnomaly = (predictedClass == 0);
-    float confidence = std::max(probabilities[0], probabilities[1]);
-    
-    std::string result = "{\n";
-    result += "  \"detection_stage\": {\n";
-    result += "    \"raw_logits\": [" + std::to_string(logits[0]) + ", " + std::to_string(logits[1]) + "],\n";
-    result += "    \"probabilities\": [" + std::to_string(probabilities[0]) + ", " + std::to_string(probabilities[1]) + "],\n";
-    result += "    \"predicted_class\": " + std::to_string(predictedClass) + ",\n";
-    result += "    \"is_anomaly\": " + std::string(isAnomaly ? "true" : "false") + ",\n";
-    result += "    \"confidence\": " + std::to_string(confidence) + ",\n";
-    result += "    \"anomaly_probability\": " + std::to_string(probabilities[0]) + ",\n";
-    result += "    \"normal_probability\": " + std::to_string(probabilities[1]) + "\n";
-    result += "  }";
-    
+nlohmann::json processDetectionOutput(const float* logits, size_t size) {
+    if (size != 2) return nullptr;
+
+    std::vector<float> probabilities(size);
+    applySoftmax(logits, size, probabilities.data());
+
+    int predicted_class = std::distance(probabilities.begin(), std::max_element(probabilities.begin(), probabilities.end()));
+    bool is_anomaly = (predicted_class == 0); // 索引0是异常
+    float confidence = probabilities[predicted_class];
+
+    nlohmann::json result;
+    result["is_anomaly"] = is_anomaly;
+    result["confidence"] = confidence;
+    result["anomaly_probability"] = probabilities[0];
+    result["normal_probability"] = probabilities[1];
+    result["raw_logits"] = {logits[0], logits[1]};
     return result;
 }
 
 /**
- * @brief 处理异常分类输出
- * @param logits 异常分类logits [6]
- * @return JSON格式结果字符串
+ * @brief 处理阶段2（异常分类）的输出
  */
-std::string processClassificationOutput(const float* logits) {
-    const char* anomalyClasses[] = {
-        "wifi_degradation",
-        "network_latency", 
-        "connection_instability",
-        "bandwidth_congestion",
-        "system_stress",
-        "dns_issues"
-    };
+nlohmann::json processClassificationOutput(const float* logits, size_t size) {
+    if (size != ANOMALY_CLASSES.size()) return nullptr;
+
+    std::vector<float> probabilities(size);
+    applySoftmax(logits, size, probabilities.data());
+
+    int predicted_index = std::distance(probabilities.begin(), std::max_element(probabilities.begin(), probabilities.end()));
+    std::string predicted_class = ANOMALY_CLASSES[predicted_index];
+    float confidence = probabilities[predicted_index];
+
+    nlohmann::json result;
+    result["predicted_class"] = predicted_class;
+    result["confidence"] = confidence;
     
-    float probabilities[6];
-    applySoftmax(logits, 6, probabilities);
-    
-    int predictedIndex = std::distance(probabilities, std::max_element(probabilities, probabilities + 6));
-    float confidence = probabilities[predictedIndex];
-    
-    std::string result = ",\n  \"classification_stage\": {\n";
-    result += "    \"raw_logits\": [";
-    for (int i = 0; i < 6; ++i) {
-        result += std::to_string(logits[i]);
-        if (i < 5) result += ", ";
+    nlohmann::json class_probs;
+    for (size_t i = 0; i < ANOMALY_CLASSES.size(); ++i) {
+        class_probs[ANOMALY_CLASSES[i]] = probabilities[i];
     }
-    result += "],\n";
-    
-    result += "    \"probabilities\": [";
-    for (int i = 0; i < 6; ++i) {
-        result += std::to_string(probabilities[i]);
-        if (i < 5) result += ", ";
-    }
-    result += "],\n";
-    
-    result += "    \"predicted_class_index\": " + std::to_string(predictedIndex) + ",\n";
-    result += "    \"predicted_class_name\": \"" + std::string(anomalyClasses[predictedIndex]) + "\",\n";
-    result += "    \"confidence\": " + std::to_string(confidence) + ",\n";
-    result += "    \"class_probabilities\": {\n";
-    
-    for (int i = 0; i < 6; ++i) {
-        result += "      \"" + std::string(anomalyClasses[i]) + "\": " + std::to_string(probabilities[i]);
-        if (i < 5) result += ",";
-        result += "\n";
-    }
-    result += "    }\n";
-    result += "  }";
-    
+    result["class_probabilities"] = class_probs;
+    result["raw_logits"] = std::vector<float>(logits, logits + size);
     return result;
 }
 
-// ================================================================================================
-// 主程序
-// ================================================================================================
 
-int main(int argc, char* argv[]) {
-    // 检查命令行参数
-    if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <detector_dlc> <classifier_dlc> <input_data_file>" << std::endl;
-        std::cerr << "Example: ./dlc_mobile_inference detector.dlc classifier.dlc input.bin" << std::endl;
-        return -1;
+// 旧的二进制处理函数，保留用于兼容性
+std::string processDetectionOutput_Legacy(const float* logits) {
+    float anomaly_score = logits[0];
+    float normal_score = logits[1];
+    bool is_anomaly = anomaly_score > normal_score;
+    return "Anomaly Detection Result: Anomaly=" + std::string(is_anomaly ? "YES" : "NO") +
+           " (Scores: " + std::to_string(anomaly_score) + " vs " + std::to_string(normal_score) + ")";
+}
+
+std::string processClassificationOutput_Legacy(const float* logits) {
+    const char* classes[] = {"wifi_degradation", "network_latency", "connection_instability", 
+                             "bandwidth_congestion", "system_stress", "dns_issues"};
+    int best_class = 0;
+    for (int i = 1; i < 6; ++i) {
+        if (logits[i] > logits[best_class]) {
+            best_class = i;
+        }
+    }
+    return "Classification Result: " + std::string(classes[best_class]);
+}
+
+/**
+ * @brief JSON处理模式主函数
+ */
+int run_json_mode(const std::string& detector_dlc, const std::string& classifier_dlc, const std::string& input_json) {
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    // 1. 加载JSON输入
+    std::vector<float> input_buffer;
+    nlohmann::json input_data;
+    try {
+        input_data = loadInputFromJson(input_json, input_buffer);
+        std::cout << "Input JSON loaded successfully (" << input_buffer.size() << " values)" << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "Error loading input: " << e.what() << std::endl;
+        return 1;
+    }
+
+    // 2. 准备模型
+    DLCModelManager detector, classifier;
+    if (!detector.loadModel(detector_dlc) || !classifier.loadModel(classifier_dlc)) {
+        return 1;
     }
     
-    std::string detectorPath = argv[1];
-    std::string classifierPath = argv[2]; 
-    std::string inputDataPath = argv[3];
-    
-    std::cout << "=== DLC Mobile Inference System ===" << std::endl;
-    std::cout << "Detector DLC: " << detectorPath << std::endl;
-    std::cout << "Classifier DLC: " << classifierPath << std::endl;
-    std::cout << "Input Data: " << inputDataPath << std::endl;
-    std::cout << "=====================================" << std::endl;
-    
-    auto startTime = std::chrono::high_resolution_clock::now();
-    
-    // ================================================================================================
-    // 1. 加载输入数据
-    // ================================================================================================
-    
-    std::cout << "Loading input data..." << std::endl;
-    
-    // 假设输入数据是11个float32值 (44字节)
-    const size_t INPUT_SIZE = 11;
-    const size_t INPUT_BYTES = INPUT_SIZE * sizeof(float);
-    
-    if (getFileSize(inputDataPath) != INPUT_BYTES) {
-        std::cerr << "Error: Input file size mismatch. Expected " << INPUT_BYTES 
-                  << " bytes, got " << getFileSize(inputDataPath) << " bytes" << std::endl;
-        return -1;
-    }
-    
-    // 分配输入缓冲区
-    std::vector<float> inputBuffer(INPUT_SIZE);
-    if (!loadFileContent(inputDataPath, reinterpret_cast<char*>(inputBuffer.data()), INPUT_BYTES)) {
-        std::cerr << "Error: Failed to load input data" << std::endl;
-        return -1;
-    }
-    
-    std::cout << "Input data loaded successfully (" << INPUT_SIZE << " values)" << std::endl;
-    
-    // ================================================================================================
-    // 2. 阶段1：异常检测
-    // ================================================================================================
-    
+    // 3. 阶段1：异常检测
     std::cout << "\n--- Stage 1: Anomaly Detection ---" << std::endl;
+    std::vector<float> detector_output(2);
+    detector.executeInference(input_buffer.data(), input_buffer.size(), detector_output.data(), detector_output.size());
+    nlohmann::json detection_result = processDetectionOutput(detector_output.data(), detector_output.size());
+    std::cout << "Anomaly detected: " << (detection_result["is_anomaly"].get<bool>() ? "YES" : "NO") << std::endl;
     
-    DLCModelManager detector;
-    if (!detector.loadModel(detectorPath)) {
-        std::cerr << "Error: Failed to load detector model" << std::endl;
-        return -1;
-    }
-    
-    // 获取输出缓冲区大小
-    size_t detectorOutputSize = detector.getOutputSize();
-    std::cout << "Detector output size: " << detectorOutputSize << " elements" << std::endl;
-    
-    // 分配输出缓冲区
-    std::vector<float> detectorOutput(detectorOutputSize);
-    
-    // 执行异常检测
-    std::cout << "Executing anomaly detection..." << std::endl;
-    if (!detector.executeInference(inputBuffer.data(), INPUT_SIZE, 
-                                  detectorOutput.data(), detectorOutputSize)) {
-        std::cerr << "Error: Anomaly detection inference failed" << std::endl;
-        detector.cleanup();
-        return -1;
-    }
-    
-    // 处理检测结果
-    std::string detectionResult = processDetectionOutput(detectorOutput.data());
-    bool isAnomaly = detectorOutput[0] > detectorOutput[1];  // 简单判断
-    
-    std::cout << "Anomaly detection completed. Is anomaly: " << (isAnomaly ? "YES" : "NO") << std::endl;
-    
-    // 保存阶段1输出
-    if (!saveDataToFile("stage1_output.bin", detectorOutput.data(), 
-                       detectorOutputSize * sizeof(float))) {
-        std::cout << "Warning: Failed to save stage 1 output" << std::endl;
-    }
-    
-    // 清理检测器
-    detector.cleanup();
-    
-    // ================================================================================================
-    // 3. 阶段2：异常分类（仅在检测到异常时执行）
-    // ================================================================================================
-    
-    std::string classificationResult = "";
-    if (isAnomaly) {
+    // 4. 阶段2：异常分类
+    nlohmann::json classification_result;
+    if (detection_result["is_anomaly"].get<bool>()) {
         std::cout << "\n--- Stage 2: Anomaly Classification ---" << std::endl;
-        
-        DLCModelManager classifier;
-        if (!classifier.loadModel(classifierPath)) {
-            std::cerr << "Error: Failed to load classifier model" << std::endl;
-            return -1;
-        }
-        
-        // 获取输出缓冲区大小
-        size_t classifierOutputSize = classifier.getOutputSize();
-        std::cout << "Classifier output size: " << classifierOutputSize << " elements" << std::endl;
-        
-        // 分配输出缓冲区
-        std::vector<float> classifierOutput(classifierOutputSize);
-        
-        // 执行异常分类
-        std::cout << "Executing anomaly classification..." << std::endl;
-        if (!classifier.executeInference(inputBuffer.data(), INPUT_SIZE,
-                                        classifierOutput.data(), classifierOutputSize)) {
-            std::cerr << "Error: Anomaly classification inference failed" << std::endl;
-            classifier.cleanup();
-            return -1;
-        }
-        
-        // 处理分类结果
-        classificationResult = processClassificationOutput(classifierOutput.data());
-        
-        std::cout << "Anomaly classification completed" << std::endl;
-        
-        // 保存阶段2输出
-        if (!saveDataToFile("stage2_output.bin", classifierOutput.data(),
-                           classifierOutputSize * sizeof(float))) {
-            std::cout << "Warning: Failed to save stage 2 output" << std::endl;
-        }
-        
-        // 清理分类器
-        classifier.cleanup();
+        std::vector<float> classifier_output(ANOMALY_CLASSES.size());
+        classifier.executeInference(input_buffer.data(), input_buffer.size(), classifier_output.data(), classifier_output.size());
+        classification_result = processClassificationOutput(classifier_output.data(), classifier_output.size());
+        std::cout << "Predicted anomaly type: " << classification_result["predicted_class"].get<std::string>() << std::endl;
     } else {
         std::cout << "\n--- Stage 2: Skipped (Normal detected) ---" << std::endl;
-        classificationResult = ",\n  \"classification_stage\": null";
+        classification_result["predicted_class"] = "normal";
+        classification_result["confidence"] = 1.0;
     }
+
+    // 5. 整合并保存最终结果
+    auto end_time = std::chrono::high_resolution_clock::now();
+    long long duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
     
-    // ================================================================================================
-    // 4. 保存最终结果
-    // ================================================================================================
-    
-    auto endTime = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-    
-    // 构建最终JSON结果
-    std::string finalResult = "{\n";
-    finalResult += "  \"timestamp\": \"" + std::to_string(std::time(nullptr)) + "\",\n";
-    finalResult += "  \"processing_time_ms\": " + std::to_string(duration.count()) + ",\n";
-    finalResult += detectionResult;
-    finalResult += classificationResult;
-    finalResult += ",\n  \"status\": \"success\"\n";
-    finalResult += "}\n";
-    
-    // 保存最终结果
-    if (!saveResultsToFile("inference_results.json", finalResult)) {
-        std::cerr << "Warning: Failed to save final results" << std::endl;
-    }
-    
-    // ================================================================================================
-    // 5. 输出统计信息
-    // ================================================================================================
+    nlohmann::json final_result;
+    final_result["timestamp"] = input_data.value("timestamp", "N/A");
+    final_result["device_id"] = input_data.value("device_id", "N/A");
+    final_result["processing_time_ms"] = duration;
+    final_result["anomaly_detection"] = detection_result;
+    final_result["anomaly_classification"] = classification_result;
     
     std::cout << "\n=== Inference Completed ===" << std::endl;
-    std::cout << "Total processing time: " << duration.count() << " ms" << std::endl;
-    std::cout << "Results saved to: inference_results.json" << std::endl;
+    std::cout << "Total processing time: " << duration << " ms" << std::endl;
+    
+    if (saveResultsToFile("inference_results.json", final_result.dump(4))) {
+        std::cout << "Results saved to: inference_results.json" << std::endl;
+    }
+
+    // 清理
+    detector.cleanup();
+    classifier.cleanup();
+    
+    std::cout << "==========================" << std::endl;
+    return 0;
+}
+
+/**
+ * @brief 二进制处理模式主函数（旧版）
+ */
+int run_binary_mode(const std::string& detector_dlc, const std::string& classifier_dlc, const std::string& input_bin) {
+    auto start_time = std::chrono::high_resolution_clock::now();
+    std::cout << "Loading input data..." << std::endl;
+    size_t inputFileSize = getFileSize(input_bin);
+    if (inputFileSize == 0) return 1;
+    
+    const size_t INPUT_SIZE = 11;
+    if (inputFileSize != INPUT_SIZE * sizeof(float)) {
+        std::cerr << "Error: Input file size " << inputFileSize 
+                  << " does not match expected size " << (INPUT_SIZE * sizeof(float)) << std::endl;
+        return 1;
+    }
+    
+    std::vector<float> inputBuffer(INPUT_SIZE);
+    if (!loadFileContent(input_bin, reinterpret_cast<char*>(inputBuffer.data()), inputFileSize)) {
+        return 1;
+    }
+    std::cout << "Input data loaded successfully (" << inputBuffer.size() << " values)" << std::endl;
+    
+    // 阶段1：异常检测
+    std::cout << "\n--- Stage 1: Anomaly Detection ---" << std::endl;
+    DLCModelManager detector;
+    if (!detector.loadModel(detector_dlc)) return 1;
+    size_t detectorOutputSize = 2;
+    std::vector<float> detectorOutput(detectorOutputSize);
+    detector.executeInference(inputBuffer.data(), inputBuffer.size(), detectorOutput.data(), detectorOutput.size());
+    std::string detectionResultStr = processDetectionOutput_Legacy(detectorOutput.data());
+    std::cout << detectionResultStr << std::endl;
+    detector.cleanup();
+    saveDataToFile("stage1_output.bin", detectorOutput.data(), detectorOutput.size() * sizeof(float));
+    
+    // 阶段2：异常分类
+    bool is_anomaly = detectorOutput[0] > detectorOutput[1];
+    if (is_anomaly) {
+        std::cout << "\n--- Stage 2: Anomaly Classification ---" << std::endl;
+        DLCModelManager classifier;
+        if (!classifier.loadModel(classifier_dlc)) return 1;
+        size_t classifierOutputSize = 6;
+        std::vector<float> classifierOutput(classifierOutputSize);
+        classifier.executeInference(inputBuffer.data(), inputBuffer.size(), classifierOutput.data(), classifierOutput.size());
+        std::string classificationResultStr = processClassificationOutput_Legacy(classifierOutput.data());
+        std::cout << classificationResultStr << std::endl;
+        classifier.cleanup();
+        saveDataToFile("stage2_output.bin", classifierOutput.data(), classifierOutput.size() * sizeof(float));
+    } else {
+        std::cout << "\n--- Stage 2: Skipped (Normal detected) ---" << std::endl;
+        // 创建一个空的stage2输出文件
+        std::ofstream("stage2_output.bin", std::ios::binary).close();
+    }
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    long long duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    
+    std::cout << "\n=== Inference Completed ===" << std::endl;
+    std::cout << "Total processing time: " << duration << " ms" << std::endl;
+    
+    // 生成简单的JSON结果
+    std::string final_result = "{\"is_anomaly\": " + std::string(is_anomaly ? "true" : "false") + "}";
+    if (saveResultsToFile("inference_results.json", final_result)) {
+        std::cout << "Results saved to: inference_results.json" << std::endl;
+    }
+    
     std::cout << "Raw outputs saved to: stage1_output.bin, stage2_output.bin" << std::endl;
     std::cout << "==========================" << std::endl;
-    
     return 0;
+}
+
+
+int main(int argc, char* argv[]) {
+    std::cout << "=== DLC Mobile Inference System ===" << std::endl;
+
+    if (argc != 4) {
+        std::cerr << "Usage: " << argv[0] << " <detector_dlc> <classifier_dlc> <input_file>" << std::endl;
+        std::cerr << "  <input_file> can be a .bin or .json file" << std::endl;
+        return 1;
+    }
+
+    std::string detector_dlc = argv[1];
+    std::string classifier_dlc = argv[2];
+    std::string input_file = argv[3];
+
+    std::cout << "Detector DLC: " << detector_dlc << std::endl;
+    std::cout << "Classifier DLC: " << classifier_dlc << std::endl;
+    std::cout << "Input Data: " << input_file << std::endl;
+    std::cout << "=====================================" << std::endl;
+
+    // 根据输入文件后缀选择模式
+    if (input_file.size() > 5 && input_file.substr(input_file.size() - 5) == ".json") {
+        return run_json_mode(detector_dlc, classifier_dlc, input_file);
+    } else if (input_file.size() > 4 && input_file.substr(input_file.size() - 4) == ".bin") {
+        return run_binary_mode(detector_dlc, classifier_dlc, input_file);
+    } else {
+        std::cerr << "Error: Input file must be .json or .bin" << std::endl;
+        return 1;
+    }
 } 

@@ -21,7 +21,9 @@ import sys
 import argparse
 import json
 import pandas as pd
+import numpy as np
 from pathlib import Path
+from typing import Dict, Any
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
 
@@ -115,7 +117,12 @@ def train_classifier(config: dict, logger: SystemLogger, data_path: str):
         
         # 训练模型 (仅使用训练集)
         logger.info("开始使用训练集训练模型...")
-        train_result = classifier.train(X_train.values, y_train.tolist())
+        
+        # 确保数据类型正确
+        X_train_values = np.array(X_train)
+        y_train_list = list(y_train)
+        
+        train_result = classifier.train(X_train_values, y_train_list)
         logger.info(f"模型训练完成。训练集准确率: {train_result.get('accuracy', 'N/A'):.3f}")
 
         # 在测试集上评估模型性能
@@ -130,26 +137,28 @@ def train_classifier(config: dict, logger: SystemLogger, data_path: str):
             return
 
         # 进行预测
-        predictions_encoded = trained_model.predict(X_test.values)
+        X_test_values = np.array(X_test)
+        predictions_encoded = trained_model.predict(X_test_values)
         predictions = label_encoder.inverse_transform(predictions_encoded)
         
         # 计算并打印评估指标
         accuracy = accuracy_score(y_test, predictions)
         
         # 获取测试数据中实际存在的标签
-        unique_labels_in_test = sorted(y_test.unique())
+        unique_labels_in_test = sorted(pd.Series(y_test).unique())
         
         # 生成分类报告时，明确指定标签和对应的名称
         report = classification_report(
             y_test, 
             predictions, 
             labels=unique_labels_in_test,
-            target_names=unique_labels_in_test
+            target_names=unique_labels_in_test,
+            output_dict=False
         )
         
         logger.info("错误分类器模型评估完成。")
         logger.info(f"测试集准确率 (Accuracy): {accuracy:.3f}")
-        logger.info("详细分类报告 (Classification Report):\n" + report)
+        logger.info("详细分类报告 (Classification Report):\n" + str(report))
 
     except FileNotFoundError:
         logger.error(f"数据文件 '{data_path}' 未找到。请提供正确的路径。")

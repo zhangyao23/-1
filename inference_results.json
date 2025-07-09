@@ -1,16 +1,19 @@
 {
-  "timestamp": "1752030361",
-  "processing_time_ms": 8,
-{
-  "detection_stage": {
-    "raw_logits": [-5477018.500000, 4459345.000000],
-    "probabilities": [0.000000, 1.000000],
-    "predicted_class": 1,
-    "is_anomaly": false,
-    "confidence": 1.000000,
-    "anomaly_probability": 0.000000,
-    "normal_probability": 1.000000
-  },
-  "classification_stage": null,
-  "status": "success"
+    "anomaly_classification": {
+        "confidence": 1.0,
+        "predicted_class": "normal"
+    },
+    "anomaly_detection": {
+        "anomaly_probability": 0.0,
+        "confidence": 1.0,
+        "is_anomaly": false,
+        "normal_probability": 1.0,
+        "raw_logits": [
+            -8611792.0,
+            7011884.5
+        ]
+    },
+    "device_id": "device_001",
+    "processing_time_ms": 26,
+    "timestamp": "2025-07-07T14:30:00Z"
 }
