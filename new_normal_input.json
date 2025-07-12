@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-07-11T00:00:00Z",
+  "device_id": "new_test_device_01",
+  "network_data": {
+    "wlan0_wireless_quality": 82.45071411132812,
+    "wlan0_signal_level": -51.38264465332031,
+    "wlan0_noise_level": -86.76155853271484,
+    "wlan0_rx_packets": 22615,
+    "wlan0_tx_packets": 11063,
+    "wlan0_rx_bytes": 2765863,
+    "wlan0_tx_bytes": 3763370,
+    "gateway_ping_time": 26.13947868347168,
+    "dns_resolution_time": 25.305255889892578,
+    "memory_usage_percent": 48.13840103149414,
+    "cpu_usage_percent": 20.36582374572754
+  }
+}

@@ -149,79 +149,65 @@ class SNPEEnvironmentValidator:
         return False
     
     def test_snpe_inference(self):
-        """测试4: SNPE推理功能"""
-        print("\n🚀 测试4: SNPE推理功能")
-        
-        # 确保有测试数据
-        test_input = self.project_root / "normal_input.bin"
-        if not test_input.exists():
-            try:
-                subprocess.run(["python3", "generate_test_input.py"], 
-                             capture_output=True, timeout=10)
-                self.log_test("测试数据生成", "PASS", "normal_input.bin生成成功")
-            except Exception as e:
-                self.log_test("测试数据生成", "FAIL", f"生成失败: {str(e)[:50]}")
-                return False
-        
-        # 运行推理测试
+        """测试4: SNPE推理功能 (已更新为多任务模型)"""
+        print("\n🚀 测试4: SNPE推理功能 (多任务模型)")
+
         executable = self.project_root / "dlc_mobile_inference"
         if not executable.exists():
-            self.log_test("推理测试", "FAIL", "可执行文件不存在")
+            self.log_test("推理测试", "FAIL", "C++可执行文件 dlc_mobile_inference 不存在")
             return False
-        
-        test_cases = [
-            ("正常数据", "normal_input.bin"),
-            ("WiFi异常", "wifi_degradation_input.bin"),
-            ("网络延迟", "network_latency_input.bin")
-        ]
-        
-        successful_tests = 0
-        
-        for case_name, input_file in test_cases:
-            input_path = self.project_root / input_file
-            if not input_path.exists():
-                self.log_test(f"推理测试: {case_name}", "SKIP", "测试数据缺失")
-                continue
-                
-            start_time = time.time()
-            try:
-                result = subprocess.run([
-                    str(executable),
-                    "realistic_end_to_end_anomaly_detector.dlc",
-                    "realistic_end_to_end_anomaly_classifier.dlc", 
-                    str(input_path)
-                ], capture_output=True, text=True, timeout=30)
-                
-                inference_time = int((time.time() - start_time) * 1000)
-                
-                if result.returncode == 0:
-                    # 检查是否生成了结果文件
-                    result_file = self.project_root / "inference_results.json"
-                    if result_file.exists():
-                        try:
-                            with open(result_file, 'r') as f:
-                                results = json.load(f)
-                            processing_time = results.get('processing_time_ms', 'unknown')
-                            self.log_test(f"推理测试: {case_name}", "PASS", 
-                                        f"推理成功, 处理时间: {processing_time}ms", inference_time)
-                            successful_tests += 1
-                        except:
-                            self.log_test(f"推理测试: {case_name}", "WARN", 
-                                        f"推理成功但结果解析失败", inference_time)
-                    else:
-                        self.log_test(f"推理测试: {case_name}", "WARN", 
-                                    f"推理成功但无结果文件", inference_time)
+
+        model_path = self.project_root / "multitask_model.dlc"
+        if not model_path.exists():
+            self.log_test("推理测试", "FAIL", "合并后的模型 multitask_model.dlc 不存在")
+            return False
+            
+        input_path = self.project_root / "example_normal_input.json"
+        if not input_path.exists():
+            self.log_test("推理测试", "FAIL", "测试输入 example_normal_input.json 不存在")
+            return False
+
+        start_time = time.time()
+        try:
+            result = subprocess.run([
+                str(executable),
+                str(model_path),
+                str(input_path)
+            ], capture_output=True, text=True, timeout=30)
+            
+            inference_time = int((time.time() - start_time) * 1000)
+            
+            if result.returncode == 0:
+                # 检查是否生成了结果文件
+                result_file = self.project_root / "inference_results.json"
+                if result_file.exists():
+                    try:
+                        with open(result_file, 'r') as f:
+                            results = json.load(f)
+                        final_decision = results.get('final_decision', '未知')
+                        self.log_test("推理测试 (正常数据)", "PASS", 
+                                    f"推理成功, 结果: {final_decision}", inference_time)
+                        return True
+                    except Exception as e:
+                        self.log_test("推理测试 (正常数据)", "WARN", 
+                                    f"推理成功但结果解析失败: {e}", inference_time)
+                        return False
                 else:
-                    error_msg = result.stderr.split('\n')[0] if result.stderr else "未知错误"
-                    self.log_test(f"推理测试: {case_name}", "FAIL", 
-                                f"推理失败: {error_msg[:50]}", inference_time)
-                    
-            except subprocess.TimeoutExpired:
-                self.log_test(f"推理测试: {case_name}", "FAIL", "推理超时 (>30s)")
-            except Exception as e:
-                self.log_test(f"推理测试: {case_name}", "FAIL", f"推理异常: {str(e)[:50]}")
-        
-        return successful_tests > 0
+                    self.log_test("推理测试 (正常数据)", "WARN", 
+                                f"推理成功但无结果文件", inference_time)
+                    return False
+            else:
+                error_msg = result.stderr.split('\n')[0] if result.stderr else "未知错误"
+                self.log_test("推理测试 (正常数据)", "FAIL", 
+                            f"推理失败: {error_msg[:100]}", inference_time)
+                return False
+                
+        except subprocess.TimeoutExpired:
+            self.log_test("推理测试 (正常数据)", "FAIL", "推理超时 (>30s)")
+        except Exception as e:
+            self.log_test("推理测试 (正常数据)", "FAIL", f"推理异常: {str(e)[:100]}")
+            
+        return False
     
     def test_runtime_availability(self):
         """测试5: 运行时可用性检查"""

@@ -180,6 +180,30 @@ nlohmann::json loadInputFromJson(const std::string& filename, std::vector<float>
     return data;
 }
 
+// --- 数据标准化参数 (从multitask_scaler.pkl提取) ---
+const std::vector<float> SCALER_MEANS = {
+    73.01415281f, -51.01792166f, -88.73394555f, 14552.42279358f,
+    11665.67295868f, 3023260.83382414f, 2507611.48480240f, 25.84133044f,
+    42.94557904f, 42.67008283f, 27.91801190f
+};
+const std::vector<float> SCALER_SCALES = {
+    16.12504647f, 10.82568044f, 6.66547091f, 5745.08336840f,
+    4602.02848101f, 1481409.03980678f, 1211595.08803516f, 17.31558252f,
+    41.49643442f, 17.50051395f, 15.07960282f
+};
+
+/**
+ * @brief 对输入向量进行标准化
+ * @param input_vector 需要被标准化的11维向量 (in-place)
+ */
+void applyStandardization(std::vector<float>& input_vector) {
+    if (input_vector.size() != 11) return;
+    for (size_t i = 0; i < 11; ++i) {
+        input_vector[i] = (input_vector[i] - SCALER_MEANS[i]) / SCALER_SCALES[i];
+    }
+}
+
+
 // ================================================================================================
 // DLC模型管理类
 // ================================================================================================
@@ -219,17 +243,36 @@ public:
         
         // 2. 创建SNPE实例
         zdl::DlSystem::RuntimeList runtimeList;
-        runtimeList.add(zdl::DlSystem::Runtime_t::CPU);  // 可根据需要修改为GPU_FLOAT16_32或DSP
+        runtimeList.add(zdl::DlSystem::Runtime_t::CPU);
+        
+        // 确保只使用CPU，避免在不确定的板子环境中使用DSP/GPU导致问题
+        // 如果你的板子环境确认支持并配置好了GPU或DSP，可以取消下面的注释
+        // runtimeList.add(zdl::DlSystem::Runtime_t::GPU_FLOAT16);
+        // runtimeList.add(zdl::DlSystem::Runtime_t::DSP_FIXED8_TF);
         
         zdl::SNPE::SNPEBuilder snpeBuilder(m_container.get());
-        m_snpe = snpeBuilder.setRuntimeProcessorOrder(runtimeList).build();
+        m_snpe = snpeBuilder.setRuntimeProcessorOrder(runtimeList)
+                           .setPerformanceProfile(zdl::DlSystem::PerformanceProfile_t::HIGH_PERFORMANCE)
+                           .build();
         
         if (m_snpe == nullptr) {
-            std::cerr << "Error: Failed to create SNPE instance for: " << modelPath << std::endl;
+            std::cerr << "Error: Failed to create SNPE instance for: " << m_modelPath << std::endl;
             return false;
         }
         
-        std::cout << "Successfully loaded model: " << modelPath << std::endl;
+        // --- 调试代码：打印模型找到的实际输出张量名称 ---
+        auto outputTensorNames = m_snpe->getOutputTensorNames();
+        if (outputTensorNames && (*outputTensorNames).size() > 0) {
+            std::cout << "DEBUG: Model's actual output tensor names are:" << std::endl;
+            for (const char* name : *outputTensorNames) {
+                std::cout << "  -> " << name << std::endl;
+            }
+        } else {
+            std::cout << "DEBUG: Could not retrieve any output tensor names from the model." << std::endl;
+        }
+        // --- 调试结束 ---
+
+        std::cout << "Successfully loaded model: " << m_modelPath << std::endl;
         return true;
     }
     
@@ -273,15 +316,20 @@ public:
     }
     
     /**
+     * @brief 获取指定名称的输出张量
+     */
+    zdl::DlSystem::ITensor* getOutputTensor(const std::string& name) {
+        if (!m_snpe) return nullptr;
+        return m_outputTensorMap.getTensor(name.c_str());
+    }
+
+    /**
      * @brief 执行推理
      * @param inputData 输入数据
      * @param inputSize 输入数据大小
-     * @param outputData 输出数据缓冲区
-     * @param outputSize 输出数据大小
      * @return 是否成功
      */
-    bool executeInference(const float* inputData, size_t inputSize, 
-                         float* outputData, size_t outputSize) {
+    bool executeInference(const float* inputData, size_t inputSize) {
         if (!m_snpe) {
             std::cerr << "Error: Model not loaded" << std::endl;
             return false;
@@ -317,35 +365,12 @@ public:
         
         m_inputTensorMap.add(inputName, inputTensor.release());
         
-        // 3. 执行推理
-        bool success = m_snpe->execute(m_inputTensorMap, m_outputTensorMap);
-        if (!success) {
-            std::cerr << "Error: Inference execution failed" << std::endl;
+        // 2. 执行推理
+        if (!m_snpe->execute(m_inputTensorMap, m_outputTensorMap)) {
+            std::cerr << "Error: SNPE model execution failed" << std::endl;
             return false;
         }
-        
-        // 4. 获取输出数据
-        auto outputTensorNames = m_snpe->getOutputTensorNames();
-        if (!outputTensorNames || (*outputTensorNames).size() == 0) {
-            std::cerr << "Error: No output tensor found" << std::endl;
-            return false;
-        }
-        
-        const char* outputName = (*outputTensorNames).at(0);
-        auto outputTensor = m_outputTensorMap.getTensor(outputName);
-        if (outputTensor == nullptr) {
-            std::cerr << "Error: Failed to get output tensor" << std::endl;
-            return false;
-        }
-        
-        // 5. 复制输出数据
-        auto outputItr = outputTensor->cbegin();
-        std::copy(outputItr, outputItr + outputSize, outputData);
-        
-        // 6. 清理
-        m_inputTensorMap.clear();
-        m_outputTensorMap.clear();
-        
+
         return true;
     }
     
@@ -418,7 +443,7 @@ nlohmann::json processDetectionOutput(const float* logits, size_t size) {
     result["confidence"] = confidence;
     result["anomaly_probability"] = probabilities[0];
     result["normal_probability"] = probabilities[1];
-    result["raw_logits"] = {logits[0], logits[1]};
+    result["raw_logits"] = std::vector<float>(logits, logits + size);
     return result;
 }
 
@@ -473,43 +498,65 @@ std::string processClassificationOutput_Legacy(const float* logits) {
 /**
  * @brief JSON处理模式主函数
  */
-int run_json_mode(const std::string& detector_dlc, const std::string& classifier_dlc, const std::string& input_json) {
+int run_json_mode(const std::string& model_dlc, const std::string& input_json) {
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    // 1. 加载JSON输入
+    // 1. 加载并标准化输入
     std::vector<float> input_buffer;
     nlohmann::json input_data;
     try {
         input_data = loadInputFromJson(input_json, input_buffer);
         std::cout << "Input JSON loaded successfully (" << input_buffer.size() << " values)" << std::endl;
+        
+        // --- 应用标准化 ---
+        applyStandardization(input_buffer);
+        std::cout << "Input data standardized." << std::endl;
+
     } catch (const std::exception& e) {
         std::cerr << "Error loading input: " << e.what() << std::endl;
         return 1;
     }
 
     // 2. 准备模型
-    DLCModelManager detector, classifier;
-    if (!detector.loadModel(detector_dlc) || !classifier.loadModel(classifier_dlc)) {
+    DLCModelManager model;
+    if (!model.loadModel(model_dlc)) {
         return 1;
     }
     
-    // 3. 阶段1：异常检测
-    std::cout << "\n--- Stage 1: Anomaly Detection ---" << std::endl;
-    std::vector<float> detector_output(2);
-    detector.executeInference(input_buffer.data(), input_buffer.size(), detector_output.data(), detector_output.size());
-    nlohmann::json detection_result = processDetectionOutput(detector_output.data(), detector_output.size());
+    // 3. 执行推理
+    std::cout << "\n--- Executing Multi-Task Model ---" << std::endl;
+    if (!model.executeInference(input_buffer.data(), input_buffer.size())) {
+        return 1;
+    }
+
+    // 4. 获取并处理输出
+    zdl::DlSystem::ITensor* output_tensor = model.getOutputTensor("combined_output");
+
+    if (!output_tensor) {
+        std::cerr << "Error: Could not retrieve the output tensor." << std::endl;
+        return 1;
+    }
+
+    // 从迭代器中提取所有8个浮点数
+    std::vector<float> combined_output;
+    auto tensor_itr = output_tensor->begin();
+    while (tensor_itr != output_tensor->end()) {
+        combined_output.push_back(*tensor_itr);
+        ++tensor_itr;
+    }
+
+    // 分割输出
+    std::vector<float> detection_logits(combined_output.begin(), combined_output.begin() + 2);
+    std::vector<float> classification_logits(combined_output.begin() + 2, combined_output.end());
+
+    nlohmann::json detection_result = processDetectionOutput(detection_logits.data(), detection_logits.size());
     std::cout << "Anomaly detected: " << (detection_result["is_anomaly"].get<bool>() ? "YES" : "NO") << std::endl;
     
-    // 4. 阶段2：异常分类
     nlohmann::json classification_result;
     if (detection_result["is_anomaly"].get<bool>()) {
-        std::cout << "\n--- Stage 2: Anomaly Classification ---" << std::endl;
-        std::vector<float> classifier_output(ANOMALY_CLASSES.size());
-        classifier.executeInference(input_buffer.data(), input_buffer.size(), classifier_output.data(), classifier_output.size());
-        classification_result = processClassificationOutput(classifier_output.data(), classifier_output.size());
+        classification_result = processClassificationOutput(classification_logits.data(), classification_logits.size());
         std::cout << "Predicted anomaly type: " << classification_result["predicted_class"].get<std::string>() << std::endl;
     } else {
-        std::cout << "\n--- Stage 2: Skipped (Normal detected) ---" << std::endl;
         classification_result["predicted_class"] = "normal";
         classification_result["confidence"] = 1.0;
     }
@@ -533,109 +580,34 @@ int run_json_mode(const std::string& detector_dlc, const std::string& classifier
     }
 
     // 清理
-    detector.cleanup();
-    classifier.cleanup();
+    model.cleanup();
     
-    std::cout << "==========================" << std::endl;
-    return 0;
-}
-
-/**
- * @brief 二进制处理模式主函数（旧版）
- */
-int run_binary_mode(const std::string& detector_dlc, const std::string& classifier_dlc, const std::string& input_bin) {
-    auto start_time = std::chrono::high_resolution_clock::now();
-    std::cout << "Loading input data..." << std::endl;
-    size_t inputFileSize = getFileSize(input_bin);
-    if (inputFileSize == 0) return 1;
-    
-    const size_t INPUT_SIZE = 11;
-    if (inputFileSize != INPUT_SIZE * sizeof(float)) {
-        std::cerr << "Error: Input file size " << inputFileSize 
-                  << " does not match expected size " << (INPUT_SIZE * sizeof(float)) << std::endl;
-        return 1;
-    }
-    
-    std::vector<float> inputBuffer(INPUT_SIZE);
-    if (!loadFileContent(input_bin, reinterpret_cast<char*>(inputBuffer.data()), inputFileSize)) {
-        return 1;
-    }
-    std::cout << "Input data loaded successfully (" << inputBuffer.size() << " values)" << std::endl;
-    
-    // 阶段1：异常检测
-    std::cout << "\n--- Stage 1: Anomaly Detection ---" << std::endl;
-    DLCModelManager detector;
-    if (!detector.loadModel(detector_dlc)) return 1;
-    size_t detectorOutputSize = 2;
-    std::vector<float> detectorOutput(detectorOutputSize);
-    detector.executeInference(inputBuffer.data(), inputBuffer.size(), detectorOutput.data(), detectorOutput.size());
-    std::string detectionResultStr = processDetectionOutput_Legacy(detectorOutput.data());
-    std::cout << detectionResultStr << std::endl;
-    detector.cleanup();
-    saveDataToFile("stage1_output.bin", detectorOutput.data(), detectorOutput.size() * sizeof(float));
-    
-    // 阶段2：异常分类
-    bool is_anomaly = detectorOutput[0] > detectorOutput[1];
-    if (is_anomaly) {
-        std::cout << "\n--- Stage 2: Anomaly Classification ---" << std::endl;
-        DLCModelManager classifier;
-        if (!classifier.loadModel(classifier_dlc)) return 1;
-        size_t classifierOutputSize = 6;
-        std::vector<float> classifierOutput(classifierOutputSize);
-        classifier.executeInference(inputBuffer.data(), inputBuffer.size(), classifierOutput.data(), classifierOutput.size());
-        std::string classificationResultStr = processClassificationOutput_Legacy(classifierOutput.data());
-        std::cout << classificationResultStr << std::endl;
-        classifier.cleanup();
-        saveDataToFile("stage2_output.bin", classifierOutput.data(), classifierOutput.size() * sizeof(float));
-    } else {
-        std::cout << "\n--- Stage 2: Skipped (Normal detected) ---" << std::endl;
-        // 创建一个空的stage2输出文件
-        std::ofstream("stage2_output.bin", std::ios::binary).close();
-    }
-    
-    auto end_time = std::chrono::high_resolution_clock::now();
-    long long duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-    
-    std::cout << "\n=== Inference Completed ===" << std::endl;
-    std::cout << "Total processing time: " << duration << " ms" << std::endl;
-    
-    // 生成简单的JSON结果
-    std::string final_result = "{\"is_anomaly\": " + std::string(is_anomaly ? "true" : "false") + "}";
-    if (saveResultsToFile("inference_results.json", final_result)) {
-        std::cout << "Results saved to: inference_results.json" << std::endl;
-    }
-    
-    std::cout << "Raw outputs saved to: stage1_output.bin, stage2_output.bin" << std::endl;
     std::cout << "==========================" << std::endl;
     return 0;
 }
 
 
 int main(int argc, char* argv[]) {
-    std::cout << "=== DLC Mobile Inference System ===" << std::endl;
+    std::cout << "=== DLC Mobile Inference System (Multi-Task Model) ===" << std::endl;
 
-    if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <detector_dlc> <classifier_dlc> <input_file>" << std::endl;
-        std::cerr << "  <input_file> can be a .bin or .json file" << std::endl;
+    if (argc != 3) {
+        std::cerr << "Usage: " << argv[0] << " <model_dlc> <input_json_file>" << std::endl;
+        std::cerr << "Example: ./dlc_mobile_inference multitask_model.dlc example_input.json" << std::endl;
         return 1;
     }
 
-    std::string detector_dlc = argv[1];
-    std::string classifier_dlc = argv[2];
-    std::string input_file = argv[3];
+    std::string model_dlc = argv[1];
+    std::string input_file = argv[2];
 
-    std::cout << "Detector DLC: " << detector_dlc << std::endl;
-    std::cout << "Classifier DLC: " << classifier_dlc << std::endl;
+    std::cout << "Model DLC: " << model_dlc << std::endl;
     std::cout << "Input Data: " << input_file << std::endl;
     std::cout << "=====================================" << std::endl;
 
-    // 根据输入文件后缀选择模式
+    // 只支持JSON模式
     if (input_file.size() > 5 && input_file.substr(input_file.size() - 5) == ".json") {
-        return run_json_mode(detector_dlc, classifier_dlc, input_file);
-    } else if (input_file.size() > 4 && input_file.substr(input_file.size() - 4) == ".bin") {
-        return run_binary_mode(detector_dlc, classifier_dlc, input_file);
+        return run_json_mode(model_dlc, input_file);
     } else {
-        std::cerr << "Error: Input file must be .json or .bin" << std::endl;
+        std::cerr << "Error: Input file must be a .json file" << std::endl;
         return 1;
     }
 } 

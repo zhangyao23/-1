@@ -1,19 +1,35 @@
 {
     "anomaly_classification": {
-        "confidence": 1.0,
-        "predicted_class": "normal"
+        "class_probabilities": {
+            "bandwidth_congestion": 0.001917658606544137,
+            "connection_instability": 1.1305524822091684e-05,
+            "dns_issues": 0.9978600144386292,
+            "network_latency": 6.149477849248797e-05,
+            "system_stress": 9.026389307109639e-05,
+            "wifi_degradation": 5.92734468227718e-05
+        },
+        "confidence": 0.9978600144386292,
+        "predicted_class": "dns_issues",
+        "raw_logits": [
+            -3.2602756023406982,
+            -3.223484992980957,
+            -4.917145729064941,
+            0.21642336249351501,
+            -2.8396990299224854,
+            6.470931529998779
+        ]
     },
     "anomaly_detection": {
-        "anomaly_probability": 0.0,
-        "confidence": 1.0,
-        "is_anomaly": false,
-        "normal_probability": 1.0,
+        "anomaly_probability": 0.9998801946640015,
+        "confidence": 0.9998801946640015,
+        "is_anomaly": true,
+        "normal_probability": 0.00011981340503552929,
         "raw_logits": [
-            -8611792.0,
-            7011884.5
+            4.457621097564697,
+            -4.571834564208984
         ]
     },
     "device_id": "device_001",
-    "processing_time_ms": 26,
+    "processing_time_ms": 20,
     "timestamp": "2025-07-07T14:30:00Z"
 }

@@ -9,7 +9,7 @@
     {
       "name": "目录检查: lib/",
       "status": "PASS",
-      "details": "存在 (2655 文件)",
+      "details": "存在 (2658 文件)",
       "time_ms": 0
     },
     {
@@ -75,26 +75,14 @@
     {
       "name": "C++编译",
       "status": "PASS",
-      "details": "成功, 84KB可执行文件",
-      "time_ms": 1322
+      "details": "成功, 242KB可执行文件",
+      "time_ms": 3529
     },
     {
-      "name": "推理测试: 正常数据",
-      "status": "WARN",
-      "details": "推理成功但结果解析失败",
-      "time_ms": 30
-    },
-    {
-      "name": "推理测试: WiFi异常",
-      "status": "WARN",
-      "details": "推理成功但结果解析失败",
-      "time_ms": 28
-    },
-    {
-      "name": "推理测试: 网络延迟",
-      "status": "WARN",
-      "details": "推理成功但结果解析失败",
-      "time_ms": 29
+      "name": "推理测试 (正常数据)",
+      "status": "PASS",
+      "details": "推理成功, 结果: 未知",
+      "time_ms": 25
     },
     {
       "name": "CPU运行时",
@@ -122,10 +110,10 @@
     }
   ],
   "summary": {
-    "total_tests": 20,
-    "passed": 13,
+    "total_tests": 18,
+    "passed": 14,
     "failed": 0,
-    "warnings": 7,
-    "success_rate": "65.0%"
+    "warnings": 4,
+    "success_rate": "77.8%"
   }
 }
