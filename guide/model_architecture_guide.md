@@ -1,3 +1,76 @@
+# PyTorch多层神经网络多任务学习方案（最终方案）
+
+## 1. 方案简介
+
+本项目最终采用的是**基于PyTorch实现的多层神经网络多任务学习模型**，即“共享主干+双输出头”结构。该方案相比早期的自编码器+随机森林，具备更高的效率、可部署性和易维护性。
+
+## 2. 结构说明
+- **输入**：11维原始网络指标
+- **主干网络**：多层全连接神经网络（含BatchNorm、ReLU、Dropout等）
+- **输出头1（检测头）**：2维输出，判断是否异常（二分类）
+- **输出头2（分类头）**：6维输出，判断异常类型（多分类）
+
+## 3. 原理简述
+- **主干网络**负责提取通用的高级特征。
+- **检测头**用于异常检测（正常/异常）。
+- **分类头**用于异常类型分类（6类）。
+- 训练时采用多任务损失函数，提升泛化能力和推理效率。
+
+## 4. 所用工具
+- **PyTorch**：主力深度学习框架，负责模型定义、训练与导出。
+- 训练脚本：`train_multitask_model.py`
+
+## 5. 结构示意图
+
+```mermaid
+graph TD
+    Input["11维原始输入"] --> Backbone["共享主干网络"]
+    Backbone --> DetHead["检测头(2维输出)"]
+    Backbone --> ClsHead["分类头(6维输出)"]
+    DetHead --> Out1["是否异常"]
+    ClsHead --> Out2["异常类型"]
+    style Backbone fill:#fff3e0
+    style DetHead fill:#e3f2fd
+    style ClsHead fill:#e3f2fd
+```
+
+## 6. 关键代码片段
+
+```python
+import torch
+import torch.nn as nn
+
+class MultiTaskAnomalyModel(nn.Module):
+    def __init__(self):
+        super(MultiTaskAnomalyModel, self).__init__()
+        self.shared_layers = nn.Sequential(
+            nn.Linear(11, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.Dropout(0.3)
+        )
+        self.detection_head = nn.Linear(64, 2)
+        self.classification_head = nn.Linear(64, 6)
+    def forward(self, x):
+        features = self.shared_layers(x)
+        detection_output = self.detection_head(features)
+        classification_output = self.classification_head(features)
+        combined_output = torch.cat((detection_output, classification_output), dim=1)
+        return combined_output
+```
+
+## 7. 与早期方案的区别
+- **早期方案**：自编码器（TensorFlow/Keras）+随机森林（Scikit-learn），两阶段、两模型，部署复杂。
+- **最终方案**：单一PyTorch多层神经网络，端到端多任务学习，一次推理完成所有任务，部署极简。
+
+---
+
+# 以下为早期方案说明（自编码器+随机森林）
+
 # AI 模型架构与工作原理解析
 
 本文档详细阐述了本AI网络异常检测系统的核心模型架构、工作原理、技术选型以及各模块文件之间的协同工作流程。
