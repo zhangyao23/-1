@@ -176,6 +176,60 @@ def check_snpe_compatibility():
         print("❌ SNPE转换工具不可用")
         return False
 
+def test_multitask_performance():
+    """
+    测试多任务模型性能
+    """
+    print("\n🔍 测试多任务模型性能...")
+    
+    # 检查是否有训练好的PyTorch模型用于性能测试
+    pytorch_model_path = "multitask_model.pth"
+    if not os.path.exists(pytorch_model_path):
+        print(f"⚠️  PyTorch模型文件不存在: {pytorch_model_path}")
+        print("跳过性能测试")
+        return True
+    
+    try:
+        import torch
+        from train_multitask_model import MultiTaskAnomalyModel
+        
+        # 加载模型
+        model = MultiTaskAnomalyModel()
+        model.load_state_dict(torch.load(pytorch_model_path, map_location='cpu'))
+        model.eval()
+        
+        # 生成测试数据
+        test_input = torch.randn(100, 11)  # 100个样本
+        
+        # 测试推理时间
+        import time
+        
+        # 预热
+        with torch.no_grad():
+            for _ in range(10):
+                _ = model(test_input[:1])
+        
+        # 性能测试
+        start_time = time.time()
+        with torch.no_grad():
+            for _ in range(100):
+                output = model(test_input)
+        end_time = time.time()
+        
+        avg_time = (end_time - start_time) / 100
+        throughput = 100 / (end_time - start_time)
+        
+        print(f"✅ 性能测试完成")
+        print(f"📊 平均推理时间: {avg_time*1000:.2f} ms")
+        print(f"📊 吞吐量: {throughput:.1f} 样本/秒")
+        print(f"📊 输出维度: 检测({output.shape[1]-6}) + 分类({6}) = {output.shape[1]}维")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ 性能测试失败: {e}")
+        return False
+
 def generate_integration_summary():
     """
     生成集成摘要
@@ -187,7 +241,8 @@ def generate_integration_summary():
         "模型文件": {
             "名称": "multitask_model.dlc",
             "大小": f"{os.path.getsize('multitask_model.dlc') / 1024:.1f} KB" if os.path.exists("multitask_model.dlc") else "未找到",
-            "状态": "✅ 可用" if os.path.exists("multitask_model.dlc") else "❌ 不可用"
+            "状态": "✅ 可用" if os.path.exists("multitask_model.dlc") else "❌ 不可用",
+            "类型": "多任务模型 (检测+分类)"
         },
         "输入格式": {
             "维度": "11维",
@@ -195,9 +250,10 @@ def generate_integration_summary():
             "字段": "WiFi信号(3) + 网络流量(4) + 网络延迟(2) + 系统资源(2)"
         },
         "输出格式": {
-            "检测": "异常检测结果 (2维)",
-            "分类": "异常分类结果 (6维)",
-            "格式": "JSON"
+            "检测": "异常检测结果 (2维: 正常/异常)",
+            "分类": "异常分类结果 (6维: 6种异常类型)",
+            "格式": "JSON",
+            "特点": "单次推理完成两个任务"
         },
         "异常类型": [
             "bandwidth_congestion",
@@ -206,6 +262,12 @@ def generate_integration_summary():
             "network_latency",
             "system_stress",
             "wifi_degradation"
+        ],
+        "性能优势": [
+            "单次推理完成检测和分类",
+            "减少计算开销",
+            "提高推理效率",
+            "统一模型管理"
         ]
     }
     
@@ -236,7 +298,8 @@ def main():
         ("DLC文件检查", check_dlc_file),
         ("输入格式验证", validate_input_format),
         ("输出格式验证", validate_output_format),
-        ("SNPE兼容性检查", check_snpe_compatibility)
+        ("SNPE兼容性检查", check_snpe_compatibility),
+        ("多任务性能测试", test_multitask_performance)
     ]
     
     results = []

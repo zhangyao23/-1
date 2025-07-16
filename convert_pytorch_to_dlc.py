@@ -51,11 +51,10 @@ def convert_to_onnx(model, output_path="multitask_model.onnx"):
         (dummy_input,),  # 将tensor包装为tuple
         output_path,
         input_names=['input'],
-        output_names=['detection_output', 'classification_output'],
+        output_names=['combined_output'],  # 只导出一个输出名
         dynamic_axes={
             'input': {0: 'batch_size'},
-            'detection_output': {0: 'batch_size'},
-            'classification_output': {0: 'batch_size'}
+            'combined_output': {0: 'batch_size'}
         },
         opset_version=11,
         do_constant_folding=True,
@@ -74,9 +73,12 @@ def convert_to_onnx(model, output_path="multitask_model.onnx"):
         print(f"❌ ONNX模型验证失败: {e}")
         return False
 
-def convert_to_dlc(onnx_path, dlc_path="multitask_model.dlc"):
+def convert_to_dlc(onnx_path, dlc_path="multitask_model.dlc", use_qairt=True):
     """
     将ONNX模型转换为DLC格式
+    支持两种转换方式：
+    - use_qairt=True: 使用qairt-converter (推荐，与幻灯片方法一致)
+    - use_qairt=False: 使用snpe-onnx-to-dlc (传统方法)
     """
     print(f"🔄 开始转换为DLC格式...")
     
@@ -88,25 +90,43 @@ def convert_to_dlc(onnx_path, dlc_path="multitask_model.dlc"):
         return False
     
     # 设置SNPE环境变量
-    os.environ['SNPE_ROOT'] = os.path.abspath(snpe_root)
+    snpe_root_abs = os.path.abspath(snpe_root)
+    os.environ['SNPE_ROOT'] = snpe_root_abs
+    os.environ['PYTHONPATH'] = f"{snpe_root_abs}/lib/python:{os.environ.get('PYTHONPATH', '')}"
     
-    # 构建SNPE转换命令
-    snpe_converter = os.path.join(snpe_root, "bin", "x86_64-linux-clang", "snpe-onnx-to-dlc")
+    # 选择转换工具
+    if use_qairt:
+        converter_name = "qairt-converter"
+        converter_path = os.path.join(snpe_root, "bin", "x86_64-linux-clang", "qairt-converter")
+        print(f"🔧 使用转换工具: {converter_name} (与幻灯片方法一致)")
+    else:
+        converter_name = "snpe-onnx-to-dlc"
+        converter_path = os.path.join(snpe_root, "bin", "x86_64-linux-clang", "snpe-onnx-to-dlc")
+        print(f"🔧 使用转换工具: {converter_name} (传统方法)")
     
-    if not os.path.exists(snpe_converter):
-        print(f"❌ SNPE转换工具未找到: {snpe_converter}")
+    if not os.path.exists(converter_path):
+        print(f"❌ 转换工具未找到: {converter_path}")
         return False
     
     # 执行转换
     import subprocess
     
-    cmd = [
-        snpe_converter,
-        "-i", onnx_path,
-        "-o", dlc_path,
-        "--input_encoding", "float",
-        "--output_encoding", "float"
-    ]
+    if use_qairt:
+        # 使用qairt-converter (幻灯片中的方法)
+        cmd = [
+            converter_path,
+            "-i", onnx_path,
+            "--output_path", dlc_path,
+            "--model_version", "1.0"
+        ]
+    else:
+        # 使用snpe-onnx-to-dlc (传统方法)
+        cmd = [
+            converter_path,
+            "-i", onnx_path,
+            "-o", dlc_path,
+            "--input_encoding", "input", "other"
+        ]
     
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -132,11 +152,11 @@ def validate_dlc_model(dlc_path="multitask_model.dlc"):
     file_size = os.path.getsize(dlc_path)
     print(f"📊 文件大小: {file_size / 1024:.1f} KB")
     
-    # 检查文件头（简单的DLC文件验证）
+    # 检查文件头（DLC文件是ZIP格式，以PK开头）
     with open(dlc_path, 'rb') as f:
-        header = f.read(16)
-        if header.startswith(b'DLC'):
-            print("✅ DLC文件格式验证通过")
+        header = f.read(4)
+        if header.startswith(b'PK'):
+            print("✅ DLC文件格式验证通过（ZIP格式）")
             return True
         else:
             print("❌ DLC文件格式验证失败")

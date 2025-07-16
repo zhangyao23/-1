@@ -9,7 +9,7 @@ onnxruntime
 pandas
 scikit-learn
 seaborn==0.12.2
-tensorflow==2.19.0
+tensorflow==2.19.0 
 torch
 
 # --- System, Network & Utilities ---

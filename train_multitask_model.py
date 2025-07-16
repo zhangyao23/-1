@@ -28,8 +28,18 @@ class MultiTaskAnomalyModel(nn.Module):
         # 输出头1: 异常检测 (2个输出: 异常, 正常)
         self.detection_head = nn.Linear(64, 2)
         
-        # 输出头2: 异常分类 (6个输出: 6种异常类型)
+        # 输出头2: 异常分类 (简化为单层)
         self.classification_head = nn.Linear(64, 6)
+        
+        # 初始化权重
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def forward(self, x):
         # 数据通过共享层
@@ -81,16 +91,16 @@ def generate_and_prepare_data():
     return train_loader, test_loader
 
 # --- 3. 训练逻辑 ---
-def train_model(model, train_loader, test_loader, epochs=120, lr=0.0005): # 降低学习率，增加epoch
-    print("🚀 Starting model training (with data augmentation and stronger regularization)...")
+def train_model(model, train_loader, test_loader, epochs=120, lr=0.00001): # 大幅降低学习率
+    print("🚀 Starting model training (with conservative settings)...")
     
     # 定义损失函数
     detection_criterion = nn.CrossEntropyLoss()
     # 对于分类任务，我们只关心异常样本的损失
-    # `ignore_index=0` 会让损失函数忽略所有标签为0（即“正常”）的样本
-    classification_criterion = nn.CrossEntropyLoss(ignore_index=0)
+    # 不使用ignore_index，而是手动过滤异常样本
+    classification_criterion = nn.CrossEntropyLoss()
     
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4) # 增加权重衰减
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-3) # 增加权重衰减
     
     for epoch in range(epochs):
         model.train()
@@ -99,7 +109,7 @@ def train_model(model, train_loader, test_loader, epochs=120, lr=0.0005): # 降�
         for batch_x, batch_det_y, batch_cls_y in train_loader:
             
             # --- 数据增强：在训练时添加少量噪声 ---
-            noise = torch.randn_like(batch_x) * 0.05 # 5%的噪声
+            noise = torch.randn_like(batch_x) * 0.01 # 进一步降低噪声
             batch_x_augmented = batch_x + noise
 
             optimizer.zero_grad()
@@ -127,10 +137,12 @@ def train_model(model, train_loader, test_loader, epochs=120, lr=0.0005): # 降�
                 loss_cls = torch.tensor(0.0, device=batch_x.device)
 
             # 将两个损失加权相加
-            # 在这个场景中，检测任务更基础，所以给它稍高的权重
-            loss = 0.6 * loss_det + 0.4 * loss_cls
+            # 更保守的损失权重
+            loss = 0.8 * loss_det + 0.2 * loss_cls
             
             loss.backward()
+            # 更强的梯度裁剪
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.1)
             optimizer.step()
             
             total_loss += loss.item()
@@ -142,6 +154,24 @@ def train_model(model, train_loader, test_loader, epochs=120, lr=0.0005): # 降�
             det_acc, cls_acc = evaluate_model(model, test_loader)
             print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}, "
                   f"Detection Acc: {det_acc:.2f}%, Classification Acc: {cls_acc:.2f}%")
+    # 训练结束后输出混淆矩阵
+    print("\n=== 多分类混淆矩阵（异常样本） ===")
+    confusion = np.zeros((6, 6), dtype=int)
+    model.eval()
+    with torch.no_grad():
+        for batch_x, batch_det_y, batch_cls_y in test_loader:
+            combined_output = model(batch_x)
+            detection_output = combined_output[:, :2]
+            classification_output = combined_output[:, 2:]
+            anomaly_mask = (batch_det_y == 1)
+            if anomaly_mask.any():
+                _, predicted_cls = torch.max(classification_output[anomaly_mask].data, 1)
+                true_cls_labels = batch_cls_y[anomaly_mask] - 1
+                for t, p in zip(true_cls_labels.cpu().numpy(), predicted_cls.cpu().numpy()):
+                    confusion[t, p] += 1
+    print("行=真实标签，列=预测标签")
+    print(confusion)
+    print("标签顺序: [wifi_degradation, network_latency, connection_instability, bandwidth_congestion, system_stress, dns_issues]")
 
 # --- 4. 评估逻辑 ---
 def evaluate_model(model, test_loader):
@@ -190,6 +220,11 @@ def main():
     # 训练模型
     train_model(model, train_loader, test_loader)
     
+    # 保存PyTorch模型
+    print("\n💾 Saving PyTorch model...")
+    torch.save(model.state_dict(), 'multitask_model.pth')
+    print("✅ PyTorch model saved as multitask_model.pth")
+    
     # 保存模型为ONNX格式
     print("\n💾 Saving model to ONNX format...")
     
@@ -212,8 +247,8 @@ def main():
     print("✅ Model saved as multitask_model.onnx")
     print("\n🎉 Training complete!")
     print("Next steps:")
-    print("1. Use `snpe-onnx-to-dlc` to convert multitask_model.onnx to a single DLC file.")
-    print("2. Update the C++ application to use the new single DLC model.")
+    print("1. Run `python3 convert_pytorch_to_dlc.py` to convert to DLC format.")
+    print("2. Use the generated multitask_model.dlc in your C++ application.")
 
 if __name__ == "__main__":
     main() 

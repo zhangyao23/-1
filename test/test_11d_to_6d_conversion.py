@@ -269,7 +269,7 @@ def main():
     
     print('\n📋 相关脚本说明:')
     print('  🔧 特征转换脚本: scripts/interactive_tester.py (convert_raw_to_6d_features)')
-    print('  🔧 数据生成脚本: scripts/generate_6d_training_data.py')
+    print('  🔧 数据生成脚本: scripts/generate_improved_6d_data.py (推荐使用)')
     print('  🔧 测试验证脚本: test/test_11d_to_6d_conversion.py (本脚本)')
     print('  🔧 系统测试脚本: test/simple_final_test.py')
     

@@ -1,0 +1,23 @@
+{
+  "anomaly_detection": {
+    "is_anomaly": true,
+    "confidence": 1.0,
+    "normal_probability": 0.0,
+    "anomaly_probability": 1.0
+  },
+  "anomaly_classification": {
+    "predicted_class": "bandwidth_congestion",
+    "confidence": 1.0,
+    "class_probabilities": {
+      "wifi_degradation": 0.0,
+      "network_latency": 0.0,
+      "connection_instability": 0.0,
+      "bandwidth_congestion": 1.0,
+      "system_stress": 0.0,
+      "dns_issues": 0.0
+    }
+  },
+  "device_id": "openwrt_device_001",
+  "timestamp": "2025-07-15T15:00:00Z",
+  "processing_time_ms": 0.63
+}

@@ -159,61 +159,61 @@ def generate_realistic_network_data(n_samples=20000):
     
     # 定义更真实的异常模式（与正常状态有部分重叠）
     anomaly_patterns = {
-        'wifi_degradation': {  # WiFi信号衰减（轻微异常）
-            'wlan0_wireless_quality': (50, 20),     # 质量下降但不极端
-            'wlan0_signal_level': (-65, 10),        # 信号稍弱
-            'wlan0_noise_level': (-80, 8),          # 噪声稍高
+        'wifi_degradation': {  # WiFi信号衰减（信号质量异常）
+            'wlan0_wireless_quality': (20, 10),     # 质量明显下降
+            'wlan0_signal_level': (-80, 8),         # 信号明显弱
+            'wlan0_noise_level': (-60, 12),         # 噪声明显高
             'wlan0_rx_packets': (8000, 3000),       # 包数减少
             'wlan0_tx_packets': (6000, 2500),       # 包数减少
             'wlan0_rx_bytes': (1500000, 600000),    # 流量减少
             'wlan0_tx_bytes': (1200000, 500000),    # 流量减少
-            'gateway_ping_time': (35, 15),          # ping稍长
+            'gateway_ping_time': (40, 15),          # ping稍长
             'dns_resolution_time': (50, 20),        # DNS稍慢
             'memory_usage_percent': (45, 15),       # 内存正常
             'cpu_usage_percent': (30, 12)           # CPU正常
         },
-        'network_latency': {  # 网络延迟（中等异常）
-            'wlan0_wireless_quality': (70, 20),     # 质量尚可
-            'wlan0_signal_level': (-55, 12),        # 信号正常
+        'network_latency': {  # 网络延迟（延迟异常）
+            'wlan0_wireless_quality': (70, 15),     # 质量尚可
+            'wlan0_signal_level': (-55, 10),        # 信号正常
             'wlan0_noise_level': (-85, 8),          # 噪声正常
             'wlan0_rx_packets': (12000, 4000),      # 包数正常
             'wlan0_tx_packets': (10000, 3000),      # 包数正常
             'wlan0_rx_bytes': (2500000, 800000),    # 流量正常
             'wlan0_tx_bytes': (2000000, 600000),    # 流量正常
-            'gateway_ping_time': (80, 25),          # ping明显长
-            'dns_resolution_time': (120, 40),       # DNS明显慢
+            'gateway_ping_time': (150, 40),         # ping明显长
+            'dns_resolution_time': (180, 60),       # DNS明显慢
             'memory_usage_percent': (40, 15),       # 内存正常
             'cpu_usage_percent': (25, 10)           # CPU正常
         },
         'connection_instability': {  # 连接不稳定（数据包问题）
-            'wlan0_wireless_quality': (60, 25),     # 质量不稳定
-            'wlan0_signal_level': (-60, 15),        # 信号不稳定
-            'wlan0_noise_level': (-75, 12),         # 噪声较高
-            'wlan0_rx_packets': (5000, 3000),       # 包数明显少
-            'wlan0_tx_packets': (4000, 2500),       # 包数明显少
-            'wlan0_rx_bytes': (800000, 500000),     # 流量少
-            'wlan0_tx_bytes': (600000, 400000),     # 流量少
-            'gateway_ping_time': (45, 20),          # ping中等
-            'dns_resolution_time': (60, 25),        # DNS中等
+            'wlan0_wireless_quality': (40, 20),     # 质量不稳定
+            'wlan0_signal_level': (-75, 15),        # 信号不稳定
+            'wlan0_noise_level': (-65, 15),         # 噪声较高
+            'wlan0_rx_packets': (2000, 1500),       # 包数明显少
+            'wlan0_tx_packets': (1500, 1000),       # 包数明显少
+            'wlan0_rx_bytes': (300000, 200000),     # 流量少
+            'wlan0_tx_bytes': (250000, 150000),     # 流量少
+            'gateway_ping_time': (80, 30),          # ping中等
+            'dns_resolution_time': (100, 40),       # DNS中等
             'memory_usage_percent': (35, 15),       # 内存正常
             'cpu_usage_percent': (20, 8)            # CPU正常
         },
         'bandwidth_congestion': {  # 带宽拥塞（高流量异常）
-            'wlan0_wireless_quality': (80, 15),     # 质量好
-            'wlan0_signal_level': (-45, 8),         # 信号好
-            'wlan0_noise_level': (-90, 5),          # 噪声低
-            'wlan0_rx_packets': (25000, 8000),      # 包数很多
-            'wlan0_tx_packets': (20000, 6000),      # 包数很多
-            'wlan0_rx_bytes': (8000000, 2000000),   # 流量很高
-            'wlan0_tx_bytes': (6500000, 1500000),   # 流量很高
-            'gateway_ping_time': (50, 20),          # ping稍长
-            'dns_resolution_time': (40, 15),        # DNS正常
-            'memory_usage_percent': (60, 20),       # 内存使用高
-            'cpu_usage_percent': (45, 15)           # CPU使用高
+            'wlan0_wireless_quality': (85, 8),      # 质量好
+            'wlan0_signal_level': (-40, 6),         # 信号好
+            'wlan0_noise_level': (-95, 3),          # 噪声低
+            'wlan0_rx_packets': (35000, 12000),     # 包数很多
+            'wlan0_tx_packets': (30000, 10000),     # 包数很多
+            'wlan0_rx_bytes': (12000000, 4000000),  # 流量很高
+            'wlan0_tx_bytes': (10000000, 3000000),  # 流量很高
+            'gateway_ping_time': (70, 25),          # ping稍长
+            'dns_resolution_time': (60, 25),        # DNS稍慢
+            'memory_usage_percent': (75, 15),       # 内存使用高
+            'cpu_usage_percent': (60, 15)           # CPU使用高
         },
         'system_stress': {  # 系统压力（资源异常）
-            'wlan0_wireless_quality': (75, 15),     # 质量正常
-            'wlan0_signal_level': (-50, 10),        # 信号正常
+            'wlan0_wireless_quality': (75, 10),     # 质量正常
+            'wlan0_signal_level': (-50, 8),         # 信号正常
             'wlan0_noise_level': (-90, 5),          # 噪声正常
             'wlan0_rx_packets': (14000, 4000),      # 包数正常
             'wlan0_tx_packets': (11000, 3000),      # 包数正常
@@ -221,19 +221,19 @@ def generate_realistic_network_data(n_samples=20000):
             'wlan0_tx_bytes': (2300000, 700000),    # 流量正常
             'gateway_ping_time': (30, 12),          # ping正常
             'dns_resolution_time': (40, 15),        # DNS正常
-            'memory_usage_percent': (85, 10),       # 内存很高
-            'cpu_usage_percent': (80, 15)           # CPU很高
+            'memory_usage_percent': (95, 4),        # 内存极高
+            'cpu_usage_percent': (90, 8)            # CPU极高
         },
         'dns_issues': {  # DNS问题（服务异常）
-            'wlan0_wireless_quality': (75, 15),     # 质量正常
-            'wlan0_signal_level': (-50, 10),        # 信号正常
+            'wlan0_wireless_quality': (75, 10),     # 质量正常
+            'wlan0_signal_level': (-50, 8),         # 信号正常
             'wlan0_noise_level': (-90, 5),          # 噪声正常
             'wlan0_rx_packets': (15000, 4000),      # 包数正常
             'wlan0_tx_packets': (12000, 3000),      # 包数正常
             'wlan0_rx_bytes': (3000000, 800000),    # 流量正常
             'wlan0_tx_bytes': (2500000, 600000),    # 流量正常
             'gateway_ping_time': (25, 10),          # ping正常
-            'dns_resolution_time': (200, 80),       # DNS很慢
+            'dns_resolution_time': (400, 150),      # DNS极慢
             'memory_usage_percent': (40, 15),       # 内存正常
             'cpu_usage_percent': (25, 10)           # CPU正常
         }

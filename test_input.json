@@ -1,0 +1,17 @@
+{
+  "network_data": {
+    "wlan0_wireless_quality": 60.0,
+    "wlan0_signal_level": -55.0,
+    "wlan0_noise_level": -80.0,
+    "wlan0_rx_packets": 950,
+    "wlan0_tx_packets": 1050,
+    "wlan0_rx_bytes": 1024000,
+    "wlan0_tx_bytes": 1536000,
+    "gateway_ping_time": 28.5,
+    "dns_resolution_time": 18.2,
+    "memory_usage_percent": 72.0,
+    "cpu_usage_percent": 68.0
+  },
+  "device_id": "openwrt_device_001",
+  "timestamp": "2025-07-15T15:00:00Z"
+}

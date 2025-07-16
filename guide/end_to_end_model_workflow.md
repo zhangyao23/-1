@@ -8,8 +8,8 @@
 
 - **数据来源**：可用真实采集、仿真生成或数据增强
 - **典型脚本**：
-  - `scripts/generate_6d_training_data.py`：生成6维特征训练数据
-  - `scripts/generate_improved_6d_data.py`：生成改进版训练数据
+  - `scripts/generate_improved_6d_data.py`：生成改进版训练数据（推荐使用）
+  - `scripts/generate_realistic_training_data.py`：生成真实场景训练数据
 - **说明**：
   - 支持多种异常类型、正常/异常样本自动标注
   - 输出为CSV格式，便于后续处理
@@ -59,7 +59,7 @@
 
 ```bash
 # 1. 生成训练数据
-python3 scripts/generate_6d_training_data.py
+python3 scripts/generate_improved_6d_data.py
 
 # 2. 数据预处理/合并
 python3 scripts/prepare_training_data.py

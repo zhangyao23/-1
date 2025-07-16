@@ -1,0 +1,115 @@
+AI网络异常检测系统 - 推理流程说明
+=====================================
+
+概述
+----
+本系统采用双模型架构：异常检测模型 + 异常分类模型
+推理流程：先检测是否异常，只有异常时才进行异常类型分类
+
+模型文件
+--------
+1. anomaly_detector.dlc    - 异常检测模型（二分类）
+2. anomaly_classifier.dlc  - 异常分类模型（六分类）
+
+输入格式
+--------
+11维JSON数据：
+{
+  "wlan0_wireless_quality": 85.0,
+  "wlan0_signal_level": -45.0,
+  "wlan0_noise_level": -92.0,
+  "wlan0_rx_packets": 18500,
+  "wlan0_tx_packets": 15200,
+  "wlan0_rx_bytes": 3500000,
+  "wlan0_tx_bytes": 2800000,
+  "gateway_ping_time": 15.0,
+  "dns_resolution_time": 25.0,
+  "memory_usage_percent": 35.0,
+  "cpu_usage_percent": 20.0
+}
+
+推理流程
+--------
+步骤1：数据预处理
+- 使用 separate_models_scaler.pkl 中的参数进行标准化
+- 将11维原始数据转换为标准化后的11维数组
+
+步骤2：异常检测
+- 输入：标准化后的11维数组
+- 模型：anomaly_detector.dlc
+- 输出：2维数组 [正常概率, 异常概率]
+- 判断：如果异常概率 > 正常概率，则进入步骤3
+
+步骤3：异常分类（仅当检测到异常时）
+- 输入：标准化后的11维数组
+- 模型：anomaly_classifier.dlc
+- 输出：6维数组 [6种异常类型的概率]
+- 结果：取最大概率对应的异常类型
+
+输出格式
+--------
+{
+  "anomaly_detection": {
+    "is_anomaly": true,
+    "confidence": 0.999,
+    "normal_probability": 0.001,
+    "anomaly_probability": 0.999
+  },
+  "anomaly_classification": {
+    "predicted_class": "dns_issues",
+    "confidence": 0.998,
+    "class_probabilities": {
+      "bandwidth_congestion": 0.002,
+      "connection_instability": 0.000,
+      "dns_issues": 0.998,
+      "network_latency": 0.000,
+      "system_stress": 0.000,
+      "wifi_degradation": 0.000
+    }
+  }
+}
+
+异常类型说明
+-----------
+0. wifi_degradation      - WiFi信号质量下降
+1. network_latency       - 网络延迟
+2. connection_instability - 连接不稳定
+3. bandwidth_congestion  - 带宽拥塞
+4. system_stress         - 系统资源紧张
+5. dns_issues           - DNS解析问题
+
+C++伪代码示例
+-------------
+std::vector<float> input_vector = preprocess_input(json_data);
+std::vector<float> det_result = run_dlc(detector_dlc, input_vector);
+
+if (det_result[1] > det_result[0]) {  // 异常概率更大
+    std::vector<float> cls_result = run_dlc(classifier_dlc, input_vector);
+    int anomaly_type = argmax(cls_result);
+    // 处理异常类型
+    std::string anomaly_name = get_anomaly_name(anomaly_type);
+} else {
+    // 网络状态正常
+}
+
+性能指标
+--------
+- 异常检测准确率：99.73%
+- 异常分类准确率：99.40%
+- 推理时间：约20-30ms
+- 内存占用：约2-5MB
+
+注意事项
+--------
+1. 确保两个DLC文件都已正确加载
+2. 数据预处理必须使用相同的标准化参数
+3. 推理顺序：先检测，后分类
+4. 只有检测到异常时才调用分类模型
+5. 异常类型索引从0开始，对应上述6种类型
+
+测试验证
+--------
+运行 test_separate_models.py 验证模型性能：
+python3 test_separate_models.py
+
+该脚本会测试6种典型异常输入，验证检测和分类的准确性。 
